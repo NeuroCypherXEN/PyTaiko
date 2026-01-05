@@ -50,7 +50,7 @@ from libs.utils import (
 )
 from libs.video import VideoPlayer
 
-from libs.osz import read_osu_note_data, note_data_to_NoteList
+from libs.osz import OsuParser
 
 logger = logging.getLogger(__name__)
 
@@ -416,10 +416,11 @@ class Player:
         unload_offset = travel_distance / sudden_pixels_per_ms
         note.unload_ms = note.hit_ms + unload_offset
 
-###from libs.osz import read_osu_note_data, note_data_to_NoteList
+###from libs.osz import OsuParser
     def reset_chart(self):
+        myparse = OsuParser()
         #notes, self.branch_m, self.branch_e, self.branch_n = self.tja.notes_to_position(self.difficulty)
-        notes = note_data_to_NoteList(read_osu_note_data(Path("./PNames.osu")))
+        notes = myparse.note_data_to_NoteList(myparse.read_osu_data(Path("./PNames.osu")))
         self.branch_m, self.branch_e, self.branch_n = [], [], []
         self.play_notes, self.draw_note_list, self.draw_bar_list = deque(apply_modifiers(notes, self.modifiers)[0]), deque(apply_modifiers(notes, self.modifiers)[1]), deque(apply_modifiers(notes, self.modifiers)[2])
 
