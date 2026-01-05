@@ -265,7 +265,7 @@ def check_args():
             selected_difficulty = args.difficulty
         else:
             selected_difficulty = max(tja.metadata.course_data.keys())
-        current_screen = Screens.GAME_PRACTICE if args.practice else Screens.AI_GAME
+        current_screen = Screens.GAME_PRACTICE if args.practice else Screens.GAME
         global_data.session_data[PlayerNum.P1].selected_song = path
         global_data.session_data[PlayerNum.P1].selected_difficulty = selected_difficulty
         global_data.modifiers[PlayerNum.P1].auto = args.auto
@@ -286,14 +286,15 @@ def check_discord_heartbeat(current_screen):
 
 def draw_fps(last_fps: int):
     curr_fps = ray.GetFPS()
+    pos = 20 * global_tex.screen_scale
     if curr_fps != 0 and curr_fps != last_fps:
         last_fps = curr_fps
     if last_fps < 30:
-        ray.DrawText(f'{last_fps} FPS'.encode('utf-8'), 20, 20, 20, ray.RED)
+        pyray.draw_text_ex(global_data.font, f'{last_fps} FPS', (pos, pos), pos, 1, pyray.RED)
     elif last_fps < 60:
-        ray.DrawText(f'{last_fps} FPS'.encode('utf-8'), 20, 20, 20, ray.YELLOW)
+        pyray.draw_text_ex(global_data.font, f'{last_fps} FPS', (pos, pos), pos, 1, pyray.YELLOW)
     else:
-        ray.DrawText(f'{last_fps} FPS'.encode('utf-8'), 20, 20, 20, ray.LIME)
+        pyray.draw_text_ex(global_data.font, f'{last_fps} FPS', (pos, pos), pos, 1, pyray.LIME)
 
 def draw_outer_border(screen_width: int, screen_height: int, last_color: pyray.Color):
     pyray.draw_rectangle(-screen_width, 0, screen_width, screen_height, last_color)

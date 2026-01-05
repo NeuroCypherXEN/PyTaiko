@@ -173,7 +173,7 @@ class GameScreen(Screen):
             existing_score = result[0] if result is not None else None
             existing_crown = result[1] if result is not None and len(result) > 1 and result[1] is not None else 0
             crown = Crown.NONE
-            if session_data.result_data.bad and session_data.result_data.ok == 0:
+            if session_data.result_data.bad == 0 and session_data.result_data.ok == 0:
                 crown = Crown.DFC
             elif session_data.result_data.bad == 0:
                 crown = Crown.FC

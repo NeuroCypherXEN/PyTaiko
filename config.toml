@@ -2,7 +2,7 @@
 fps_counter = false
 audio_offset = 0
 visual_offset = 0
-language = "ja"
+language = "en"
 timer_frozen = true
 judge_counter = false
 nijiiro_notes = false
