@@ -15,10 +15,20 @@ from libs.tja import TimelineObject, Note, NoteType, Drumroll, Balloon, NoteList
 
 import re
 
-osu_file = Path("./Renatus.osu")
+osu_file = Path("./PNames.osu")
 contents = osu_file.open(mode='r', encoding='utf-8').read()
 
 class OsuParser:
+    general: dict[str, str]
+    editor: dict[str, str]
+    metadata: dict[str, str]
+    difficulty: dict[str, str]
+    events: list[int]
+    timing_points: list[int]
+    hit_objects: list[int]
+
+    bpm: int
+
     def __init__(self, osu_file):
         self.general = self.read_osu_data(osu_file, target_header="General", is_dict=True)
         self.editor = self.read_osu_data(osu_file, target_header="Editor", is_dict=True)
@@ -29,7 +39,9 @@ class OsuParser:
         #self.general = self.read_osu_data(osu_file, target_header="Colours", is_dict=True)
         self.hit_objects = self.read_osu_data(osu_file, target_header="HitObjects")
 
+        self.bpm = math.floor(1 / self.timing_points[0][1] * 1000 * 60)
         self.osu_NoteList = self.note_data_to_NoteList(self.hit_objects)
+
 
     def read_osu_data(self, file_path, target_header="HitObjects", is_dict = False):
         data = []
@@ -72,7 +84,7 @@ class OsuParser:
                 don = Note()
                 don.type = NoteType(1)
                 don.hit_ms = line[2]
-                don.bpm = 207
+                don.bpm = self.bpm
                 don.scroll_x = 1
                 don.scroll_y = 0
                 don.display = True
@@ -86,7 +98,7 @@ class OsuParser:
                 kat = Note()
                 kat.type = NoteType(2)
                 kat.hit_ms = line[2]
-                kat.bpm = 207
+                kat.bpm = self.bpm
                 kat.scroll_x = 1
                 kat.scroll_y = 0
                 kat.display = True
@@ -100,7 +112,7 @@ class OsuParser:
                 don = Note()
                 don.type = NoteType(3)
                 don.hit_ms = line[2]
-                don.bpm = 207
+                don.bpm = self.bpm
                 don.scroll_x = 1
                 don.scroll_y = 0
                 don.display = True
@@ -114,7 +126,7 @@ class OsuParser:
                 kat = Note()
                 kat.type = NoteType(4)
                 kat.hit_ms = line[2]
-                kat.bpm = 207
+                kat.bpm = self.bpm
                 kat.scroll_x = 1
                 kat.scroll_y = 0
                 kat.display = True
@@ -124,16 +136,25 @@ class OsuParser:
 
                 osu_NoteList.play_notes.append(kat)
 
-            if (line[3] == 2): # Drum Roll
+            if (line[3] == 2) and (line[4] == 0): # Drum Roll
                 source = Note()
+                source.type = NoteType(5)
+                source.hit_ms = line[2]
+                source.bpm = self.bpm
+                source.scroll_x = 1
+                source.scroll_y = 0
+                source.display = True
+                source.index = counter
+                counter = counter + 1
+                #kat.moji = 1
+
                 slider = Drumroll(source)
 
             if (line[3] == 8): # Balloon
-                print(line)
                 source = Note()
                 source.type = NoteType(7)
                 source.hit_ms = line[2]
-                source.bpm = 207
+                source.bpm = self.bpm
                 source.scroll_x = 1
                 source.scroll_y = 0
                 source.display = True
@@ -144,7 +165,7 @@ class OsuParser:
                 balloon = Balloon(source)
                 balloon.type = NoteType(8)
                 balloon.hit_ms = line[5]
-                balloon.bpm = 207
+                balloon.bpm = self.bpm
                 balloon.scroll_x = 1
                 balloon.scroll_y = 0
                 balloon.display = True
@@ -162,6 +183,6 @@ class OsuParser:
 
 myparse = OsuParser(osu_file)
 
-#print(myparse.osu_NoteList)
+print(myparse.bpm)
 
 
