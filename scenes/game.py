@@ -945,7 +945,7 @@ class Player:
             big = curr_note.type == NoteType.DON_L or curr_note.type == NoteType.KAT_L
             if (curr_note.hit_ms - good_window_ms) <= ms_from_start <= (curr_note.hit_ms + good_window_ms):
                 self.draw_judge_list.append(Judgment(Judgments.GOOD, big, self.is_2p))
-                self.lane_hit_effect = LaneHitEffect(Judgments.GOOD, self.is_2p)
+                self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.GOOD, self.is_2p)
                 self.good_count += 1
                 self.score += self.base_score
                 self.base_score_list.append(ScoreCounterAnimation(self.player_num, self.base_score, self.is_2p))
@@ -963,6 +963,7 @@ class Player:
 
             elif (curr_note.hit_ms - ok_window_ms) <= ms_from_start <= (curr_note.hit_ms + ok_window_ms):
                 self.draw_judge_list.append(Judgment(Judgments.OK, big, self.is_2p))
+                self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.OK, self.is_2p)
                 self.ok_count += 1
                 self.score += 10 * math.floor(self.base_score / 2 / 10)
                 self.base_score_list.append(ScoreCounterAnimation(self.player_num, 10 * math.floor(self.base_score / 2 / 10), self.is_2p))
@@ -1026,7 +1027,7 @@ class Player:
                 self.kusudama_anim = None
 
     def spawn_hit_effects(self, drum_type: DrumType, side: Side):
-        self.lane_hit_effect = LaneHitEffect(drum_type, self.is_2p)
+        self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.BAD, self.is_2p)  # Bad code detected...
         self.draw_drum_hit_list.append(DrumHitEffect(drum_type, side, self.is_2p))
 
     def handle_input(self, ms_from_start: float, current_time: float, background: Optional[Background]):
@@ -1451,9 +1452,10 @@ class Judgment:
 
 class LaneHitEffect:
     """Display a gradient overlay when the player hits the drum"""
-    def __init__(self, type: Judgments | DrumType, is_2p: bool):
+    def __init__(self, type: DrumType, judgment: Judgments, is_2p: bool):
         self.is_2p = is_2p
         self.type = type
+        self.judgment = judgment
         self.fade = tex.get_animation(0, is_copy=True)
         self.fade.start()
         self.is_finished = False
@@ -1464,12 +1466,12 @@ class LaneHitEffect:
             self.is_finished = True
 
     def draw(self):
-        if self.type == Judgments.GOOD:
-            tex.draw_texture('lane', 'lane_hit_effect', frame=2, index=self.is_2p, fade=self.fade.attribute)
-        elif self.type == DrumType.DON:
+        if self.type == DrumType.DON:
             tex.draw_texture('lane', 'lane_hit_effect', frame=0, index=self.is_2p, fade=self.fade.attribute)
         elif self.type == DrumType.KAT:
             tex.draw_texture('lane', 'lane_hit_effect', frame=1, index=self.is_2p, fade=self.fade.attribute)
+        if self.judgment == Judgments.GOOD or self.judgment == Judgments.OK:
+            tex.draw_texture('lane', 'lane_hit_effect', frame=2, index=self.is_2p, fade=self.fade.attribute)
 
 class DrumHitEffect:
     """Display the side of the drum hit"""
