@@ -418,9 +418,9 @@ class Player:
 
 ###from libs.osz import OsuParser
     def reset_chart(self):
-        myparse = OsuParser()
         #notes, self.branch_m, self.branch_e, self.branch_n = self.tja.notes_to_position(self.difficulty)
-        notes = myparse.note_data_to_NoteList(myparse.read_osu_data(Path("./PNames.osu")))
+        myparse = OsuParser(Path("./PNames.osu"))
+        notes = myparse.osu_NoteList
         self.branch_m, self.branch_e, self.branch_n = [], [], []
         self.play_notes, self.draw_note_list, self.draw_bar_list = deque(apply_modifiers(notes, self.modifiers)[0]), deque(apply_modifiers(notes, self.modifiers)[1]), deque(apply_modifiers(notes, self.modifiers)[2])
 
