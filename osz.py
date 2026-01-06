@@ -15,9 +15,6 @@ from libs.tja import TimelineObject, Note, NoteType, Drumroll, Balloon, NoteList
 
 import re
 
-osu_file = Path("./PNames.osu")
-contents = osu_file.open(mode='r', encoding='utf-8').read()
-
 class OsuParser:
     general: dict[str, str]
     editor: dict[str, str]
@@ -27,7 +24,7 @@ class OsuParser:
     timing_points: list[int]
     hit_objects: list[int]
 
-    bpm: int
+    bpm: list[int]
 
     def __init__(self, osu_file):
         self.general = self.read_osu_data(osu_file, target_header="General", is_dict=True)
@@ -38,8 +35,9 @@ class OsuParser:
         self.timing_points = self.read_osu_data(osu_file, target_header="TimingPoints")
         #self.general = self.read_osu_data(osu_file, target_header="Colours", is_dict=True)
         self.hit_objects = self.read_osu_data(osu_file, target_header="HitObjects")
-
-        self.bpm = math.floor(1 / self.timing_points[0][1] * 1000 * 60)
+        self.bpm = []
+        for points in self.timing_points:
+            self.bpm.append(math.floor(1 / points[1] * 1000 * 60))
         self.osu_NoteList = self.note_data_to_NoteList(self.hit_objects)
 
 
@@ -84,7 +82,7 @@ class OsuParser:
                 don = Note()
                 don.type = NoteType(1)
                 don.hit_ms = line[2]
-                don.bpm = self.bpm
+                don.bpm = self.bpm[0]
                 don.scroll_x = 1
                 don.scroll_y = 0
                 don.display = True
@@ -98,7 +96,7 @@ class OsuParser:
                 kat = Note()
                 kat.type = NoteType(2)
                 kat.hit_ms = line[2]
-                kat.bpm = self.bpm
+                kat.bpm = self.bpm[0]
                 kat.scroll_x = 1
                 kat.scroll_y = 0
                 kat.display = True
@@ -112,7 +110,7 @@ class OsuParser:
                 don = Note()
                 don.type = NoteType(3)
                 don.hit_ms = line[2]
-                don.bpm = self.bpm
+                don.bpm = self.bpm[0]
                 don.scroll_x = 1
                 don.scroll_y = 0
                 don.display = True
@@ -126,7 +124,7 @@ class OsuParser:
                 kat = Note()
                 kat.type = NoteType(4)
                 kat.hit_ms = line[2]
-                kat.bpm = self.bpm
+                kat.bpm = self.bpm[0]
                 kat.scroll_x = 1
                 kat.scroll_y = 0
                 kat.display = True
@@ -137,52 +135,109 @@ class OsuParser:
                 osu_NoteList.play_notes.append(kat)
 
             if (line[3] == 2) and (line[4] == 0): # Drum Roll
+                if len(line) >= 9:
+                    slider_time = line[8] / (float(self.difficulty["SliderMultiplier"])  * 100) * self.timing_points[0][1]
+                else:
+                    slider_time = line[6] / (float(self.difficulty["SliderMultiplier"])  * 100) * self.timing_points[0][1]
+
                 source = Note()
-                source.type = NoteType(5)
-                source.hit_ms = line[2]
-                source.bpm = self.bpm
+                source.type = NoteType(8)
+                source.hit_ms = line[2] + slider_time
+                source.bpm = self.bpm[0]
                 source.scroll_x = 1
                 source.scroll_y = 0
                 source.display = True
-                source.index = counter
-                counter = counter + 1
-                #kat.moji = 1
+                # this is where the index would be if it wasn't a tail note
+                source.moji = 0
 
                 slider = Drumroll(source)
+                slider.color = 255
+                slider.type = NoteType(5)
+                slider.hit_ms = line[2]
+                slider.bpm = self.bpm[0]
+                slider.scroll_x = 1
+                slider.scroll_y = 0
+                slider.display = True
+                slider.index = counter
+                counter = counter + 1
+
+                source.index = counter
+                counter = counter + 1
+
+                osu_NoteList.play_notes.append(slider)
+                osu_NoteList.play_notes.append(source)
+
+            if (line[3] == 2) and (line[4] == 4): # L-Drum Roll
+                if len(line) >= 9:
+                    slider_time = line[8] / (float(self.difficulty["SliderMultiplier"])  * 100) * self.timing_points[0][1]
+                else:
+                    slider_time = line[6] / (float(self.difficulty["SliderMultiplier"])  * 100) * self.timing_points[0][1]
+
+                source = Note()
+                source.type = NoteType(8)
+                source.hit_ms = line[2] + slider_time
+                source.bpm = self.bpm[0]
+                source.scroll_x = 1
+                source.scroll_y = 0
+                source.display = True
+                # this is where the index would be if it wasn't a tail note
+                source.moji = 0
+
+                slider = Drumroll(source)
+                slider.color = 255
+                slider.type = NoteType(6)
+                slider.hit_ms = line[2]
+                slider.bpm = self.bpm[0]
+                slider.scroll_x = 1
+                slider.scroll_y = 0
+                slider.display = True
+                slider.index = counter
+                counter = counter + 1
+
+                source.index = counter
+                counter = counter + 1
+
+                osu_NoteList.play_notes.append(slider)
+                osu_NoteList.play_notes.append(source)
 
             if (line[3] == 8): # Balloon
                 source = Note()
-                source.type = NoteType(7)
-                source.hit_ms = line[2]
-                source.bpm = self.bpm
+                source.type = NoteType(8)
+                source.hit_ms = line[5]
+                source.bpm = self.bpm[0]
                 source.scroll_x = 1
                 source.scroll_y = 0
                 source.display = True
-                source.index = counter
-                counter = counter + 1
-                #kat.moji = 1
+                #source.index = counter
+                #counter = counter + 1
+                source.moji = 0
 
                 balloon = Balloon(source)
-                balloon.type = NoteType(8)
-                balloon.hit_ms = line[5]
-                balloon.bpm = self.bpm
+                balloon.type = NoteType(7)
+                balloon.hit_ms = line[2]
+                balloon.bpm = self.bpm[0]
                 balloon.scroll_x = 1
                 balloon.scroll_y = 0
                 balloon.display = True
                 balloon.index = counter
                 counter = counter + 1
-                #kat.moji = 1
-                balloon.count = 999
+                balloon.moji = 0
+
+                od = int(self.difficulty["OverallDifficulty"])
+                # thank you https://github.com/IepIweidieng/osu2tja/blob/dev-iid/osu2tja/osu2tja.py
+                hit_multiplyer = (5 - 2 * (5 - od) / 5 if od < 5
+                                else 5 + 2.5 * (od - 5) / 5 if od > 5
+                                else 5) * 1.65
+                balloon.count = 20#int(max(1, (ret[-1][1] - ret[-2][1]) / 1000 * hit_multiplier))
+                # end of 'stolen' code
+                source.index = counter
+                counter = counter + 1
 
                 osu_NoteList.play_notes.append(balloon)
+                osu_NoteList.play_notes.append(source)
 
         osu_NoteList.draw_notes = osu_NoteList.play_notes.copy()
 
         return osu_NoteList
-
-
-myparse = OsuParser(osu_file)
-
-print(myparse.bpm)
 
 
