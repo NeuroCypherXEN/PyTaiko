@@ -50,8 +50,6 @@ from libs.utils import (
 )
 from libs.video import VideoPlayer
 
-from libs.osz import OsuParser
-
 logger = logging.getLogger(__name__)
 
 class DrumType(IntEnum):
@@ -416,11 +414,8 @@ class Player:
         unload_offset = travel_distance / sudden_pixels_per_ms
         note.unload_ms = note.hit_ms + unload_offset
 
-###from libs.osz import OsuParser
     def reset_chart(self):
-        #notes, self.branch_m, self.branch_e, self.branch_n = self.tja.notes_to_position(self.difficulty)
-        myparse = OsuParser(Path("./Cirno.osu"))
-        notes = myparse.osu_NoteList
+        notes, self.branch_m, self.branch_e, self.branch_n = self.tja.notes_to_position(self.difficulty)
         self.branch_m, self.branch_e, self.branch_n = [], [], []
         self.play_notes, self.draw_note_list, self.draw_bar_list = deque(apply_modifiers(notes, self.modifiers)[0]), deque(apply_modifiers(notes, self.modifiers)[1]), deque(apply_modifiers(notes, self.modifiers)[2])
 
