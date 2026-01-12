@@ -15,7 +15,7 @@ from libs.chara_2d import Chara2D
 from libs.global_data import Difficulty, Modifiers, PlayerNum, global_data
 from libs.global_objects import Nameplate
 from libs.texture import tex
-from libs.tja import TJAParser
+from libs.parsers.tja import TJAParser
 from libs.utils import get_current_ms, global_tex
 from scenes.game import (
     DrumType,

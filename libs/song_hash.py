@@ -8,7 +8,7 @@ from pathlib import Path
 
 from libs.config import get_config
 from libs.global_data import Crown
-from libs.tja import NoteList, TJAParser, test_encodings
+from libs.parsers.tja import NoteList, TJAParser, test_encodings
 from libs.utils import global_data
 
 logger = logging.getLogger(__name__)

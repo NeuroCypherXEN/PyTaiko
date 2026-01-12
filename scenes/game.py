@@ -25,7 +25,7 @@ from libs.global_data import (
 from libs.global_objects import AllNetIcon, Nameplate
 from libs.screen import Screen
 from libs.texture import tex
-from libs.tja import (
+from libs.parsers.tja import (
     Balloon,
     Drumroll,
     Note,

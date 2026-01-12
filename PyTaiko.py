@@ -20,7 +20,7 @@ from libs.config import get_config
 from libs.global_data import PlayerNum, ScoreMethod
 from libs.screen import Screen
 from libs.song_hash import DB_VERSION
-from libs.tja import TJAParser
+from libs.parsers.tja import TJAParser
 from libs.utils import (
     force_dedicated_gpu,
     get_current_ms,

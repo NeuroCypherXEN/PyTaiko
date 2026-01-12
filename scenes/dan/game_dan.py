@@ -16,7 +16,7 @@ from libs.global_data import (
 )
 from libs.global_objects import AllNetIcon
 from libs.texture import tex
-from libs.tja import TJAParser
+from libs.parsers.tja import TJAParser
 from libs.transition import Transition
 from libs.utils import OutlinedText, get_current_ms
 from scenes.game import (

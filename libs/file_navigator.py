@@ -15,7 +15,7 @@ from libs.animation import Animation, MoveAnimation
 from libs.audio import audio
 from libs.global_data import Crown, Difficulty, ScoreMethod
 from libs.texture import tex
-from libs.tja import TJAParser, test_encodings
+from libs.parsers.tja import TJAParser, test_encodings
 from libs.utils import OutlinedText, get_current_ms, global_data
 
 BOX_CENTER = 594 * tex.screen_scale

@@ -12,7 +12,7 @@ from libs.audio import audio
 from libs.background import Background
 from libs.global_data import Modifiers, PlayerNum, global_data
 from libs.texture import tex
-from libs.tja import (
+from libs.parsers.tja import (
     Balloon,
     Drumroll,
     NoteType,

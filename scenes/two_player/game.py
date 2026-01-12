@@ -6,7 +6,7 @@ import pyray as ray
 
 from libs.audio import audio
 from libs.global_data import PlayerNum
-from libs.tja import TJAParser
+from libs.parsers.tja import TJAParser
 from libs.utils import get_current_ms, global_data
 from libs.video import VideoPlayer
 from scenes.game import (
