@@ -167,9 +167,9 @@ class TwoPlayerSongSelectScreen(SongSelectScreen):
             if not isinstance(selected_song, SongFile):
                 raise Exception("picked directory")
 
-            title = selected_song.tja.metadata.title.get(
+            title = selected_song.parser.metadata.title.get(
                 global_data.config['general']['language'], '')
-            subtitle = selected_song.tja.metadata.subtitle.get(
+            subtitle = selected_song.parser.metadata.subtitle.get(
                 global_data.config['general']['language'], '')
             self.game_transition = Transition(title, subtitle)
             self.game_transition.start()

@@ -111,7 +111,7 @@ class DanGameScreen(GameScreen):
 
         if self.tja.metadata.wave.exists() and self.tja.metadata.wave.is_file() and self.song_music is None:
             self.song_music = audio.load_music_stream(self.tja.metadata.wave, 'song')
-        self.player_1.tja = self.tja
+        self.player_1.parser = self.tja
         self.player_1.reset_chart()
         self.dan_transition.start()
         self.song_info = SongInfo(self.tja.metadata.title.get(global_data.config["general"]["language"], "en"), genre_index)

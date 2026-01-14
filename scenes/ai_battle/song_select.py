@@ -98,7 +98,7 @@ class AISongSelectPlayer(SongSelectPlayer):
     def on_song_selected(self, selected_song: SongFile):
         """Called when a song is selected"""
         super().on_song_selected(selected_song)
-        self.subdiff_selector = SubdiffSelector(self.player_num, min(selected_song.tja.metadata.course_data))
+        self.subdiff_selector = SubdiffSelector(self.player_num, min(selected_song.parser.metadata.course_data))
 
     def handle_input_selected(self, current_item):
         """Handle input for selecting difficulty. Returns 'cancel', 'confirm', or None"""

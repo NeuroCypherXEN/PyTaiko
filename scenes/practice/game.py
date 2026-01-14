@@ -98,7 +98,7 @@ class PracticeGameScreen(GameScreen):
             start_time = self.bars[previous_bar_index].hit_ms - first_bar_time + self.start_delay
 
             tja_copy = copy.deepcopy(self.scrobbling_tja)
-            self.player_1.tja = tja_copy
+            self.player_1.parser = tja_copy
             self.player_1.reset_chart()
 
             self.player_1.don_notes = deque([note for note in self.player_1.don_notes if note.hit_ms > resume_time])
