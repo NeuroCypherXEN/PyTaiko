@@ -158,7 +158,7 @@ class AISongSelectPlayer(SongSelectPlayer):
         if is_l_kat_pressed(self.player_num) or is_r_kat_pressed(self.player_num):
             audio.play_sound('kat', 'sound')
             selected_song = current_item
-            diffs = sorted(selected_song.tja.metadata.course_data)
+            diffs = sorted(selected_song.parser.metadata.course_data)
             prev_diff = self.selected_difficulty
             ret_val = None
 
