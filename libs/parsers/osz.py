@@ -1,24 +1,15 @@
 import hashlib
-import logging
 import math
-import random
-from collections import deque
-from dataclasses import dataclass, field, fields
-from enum import IntEnum
-from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
-from libs.global_data import Modifiers
-from libs.utils import strip_comments
-from libs.tja import TimelineObject, Note, NoteType, Drumroll, Balloon, NoteList, CourseData, ParserState
+from libs.parsers.tja import CourseData, Note, NoteType, Drumroll, Balloon, NoteList, TJAMetadata
 
 import re
 
 class OsuParser:
     general: dict[str, str]
     editor: dict[str, str]
-    metadata: dict[str, str]
+    osu_metadata: dict[str, str]
     difficulty: dict[str, str]
     events: list[int]
     timing_points: list[int]
@@ -26,22 +17,24 @@ class OsuParser:
 
     bpm: list[int]
 
-    def __init__(self, osu_file):
+    def __init__(self, osu_file: Path):
         self.general = self.read_osu_data(osu_file, target_header="General", is_dict=True)
         self.editor = self.read_osu_data(osu_file, target_header="Editor", is_dict=True)
-        self.metadata = self.read_osu_data(osu_file, target_header="Metadata", is_dict=True)
+        self.osu_metadata = self.read_osu_data(osu_file, target_header="Metadata", is_dict=True)
         self.difficulty = self.read_osu_data(osu_file, target_header="Difficulty", is_dict=True)
         self.events = self.read_osu_data(osu_file, target_header="Events")
         self.timing_points = self.read_osu_data(osu_file, target_header="TimingPoints")
         #self.general = self.read_osu_data(osu_file, target_header="Colours", is_dict=True)
         self.hit_objects = self.read_osu_data(osu_file, target_header="HitObjects")
         self.bpm = []
+        self.metadata = TJAMetadata()
+        self.metadata.wave = osu_file.parent / self.general["AudioFilename"]
+        self.metadata.course_data[0] = CourseData()
         for points in self.timing_points:
             self.bpm.append(math.floor(1 / points[1] * 1000 * 60))
         self.osu_NoteList = self.note_data_to_NoteList(self.hit_objects)
 
-
-    def read_osu_data(self, file_path, target_header="HitObjects", is_dict = False):
+    def read_osu_data(self, file_path: Path, target_header="HitObjects", is_dict = False):
         data = []
         if is_dict:
             data = {}
@@ -72,7 +65,7 @@ class OsuParser:
 
         return data
 
-    def note_data_to_NoteList(self, note_data):
+    def note_data_to_NoteList(self, note_data) -> tuple[NoteList, list[NoteList], list[NoteList], list[NoteList]]:
         osu_NoteList = NoteList()
         counter = 0
 
@@ -238,6 +231,29 @@ class OsuParser:
 
         osu_NoteList.draw_notes = osu_NoteList.play_notes.copy()
 
-        return osu_NoteList
+        return osu_NoteList, [], [], []
 
+    def notes_to_position(self, difficulty):
+        return self.osu_NoteList
 
+    def hash_note_data(self, notes: NoteList):
+        """Hashes the note data for the given NoteList."""
+        n = hashlib.sha256()
+        list1 = notes.play_notes
+        list2 = notes.bars
+        merged: list[Note | Drumroll | Balloon] = []
+        i = 0
+        j = 0
+        while i < len(list1) and j < len(list2):
+            if list1[i] <= list2[j]:
+                merged.append(list1[i])
+                i += 1
+            else:
+                merged.append(list2[j])
+                j += 1
+        merged.extend(list1[i:])
+        merged.extend(list2[j:])
+        for item in merged:
+            n.update(item.get_hash().encode('utf-8'))
+
+        return n.hexdigest()

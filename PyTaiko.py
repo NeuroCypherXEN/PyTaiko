@@ -17,7 +17,7 @@ from raylib.defines import (
 
 from libs.audio import audio
 from libs.config import get_config
-from libs.global_data import PlayerNum, ScoreMethod
+from libs.global_data import Difficulty, PlayerNum, ScoreMethod
 from libs.screen import Screen
 from libs.song_hash import DB_VERSION
 from libs.parsers.tja import TJAParser
@@ -264,7 +264,10 @@ def check_args():
                 parser.error(f"Invalid difficulty: {args.difficulty}. Available: {list(tja.metadata.course_data.keys())}")
             selected_difficulty = args.difficulty
         else:
-            selected_difficulty = max(tja.metadata.course_data.keys())
+            if not tja.metadata.course_data:
+                selected_difficulty = Difficulty.ONI
+            else:
+                selected_difficulty = max(tja.metadata.course_data.keys())
         current_screen = Screens.GAME_PRACTICE if args.practice else Screens.GAME
         global_data.session_data[PlayerNum.P1].selected_song = path
         global_data.session_data[PlayerNum.P1].selected_difficulty = selected_difficulty

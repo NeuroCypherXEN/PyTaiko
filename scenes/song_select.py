@@ -16,6 +16,7 @@ from libs.file_navigator import (
     GenreIndex,
     SongBox,
     SongFile,
+    SongFileOsu,
     navigator,
 )
 from libs.global_data import Difficulty, Modifiers, PlayerNum
@@ -101,7 +102,7 @@ class SongSelectScreen(Screen):
                 self.navigator.mark_crowns_dirty_for_song(selected_song)
 
         curr_item = self.navigator.get_current_item()
-        if isinstance(curr_item, SongFile):
+        if isinstance(curr_item, SongFile) or isinstance(curr_item, SongFileOsu):
             curr_item.box.get_scores()
         self.navigator.add_recent()
 
@@ -116,7 +117,7 @@ class SongSelectScreen(Screen):
         ray.set_shader_value(self.shader, source_loc, source_color, SHADER_UNIFORM_VEC3)
         ray.set_shader_value(self.shader, target_loc, target_color, SHADER_UNIFORM_VEC3)
 
-    def finalize_song(self, current_item: SongFile):
+    def finalize_song(self, current_item: SongFile | SongFileOsu):
         global_data.session_data[global_data.player_num].selected_song = current_item.path
         global_data.session_data[global_data.player_num].song_hash = global_data.song_hashes[current_item.hash][0]["diff_hashes"][self.player_1.selected_difficulty]
         global_data.session_data[global_data.player_num].selected_difficulty = self.player_1.selected_difficulty
@@ -126,7 +127,7 @@ class SongSelectScreen(Screen):
         self.screen_init = False
         self.reset_demo_music()
         current_item = self.navigator.get_current_item()
-        if isinstance(current_item, SongFile) and self.player_1.is_ready:
+        if (isinstance(current_item, SongFile) or isinstance(current_item, SongFileOsu)) and self.player_1.is_ready:
             self.finalize_song(current_item)
         self.player_1.nameplate.unload()
         if isinstance(current_item.box, SongBox) and current_item.box.yellow_box is not None:
@@ -183,7 +184,7 @@ class SongSelectScreen(Screen):
                 audio.stop_sound('bgm')
                 return
             selected_song = self.navigator.select_current_item()
-            if isinstance(selected_song, SongFile):
+            if isinstance(selected_song, SongFile) or isinstance(selected_song, SongFileOsu):
                 self.state = State.SONG_SELECTED
                 self.player_1.on_song_selected(selected_song)
                 audio.play_sound('don', 'sound')
@@ -284,12 +285,12 @@ class SongSelectScreen(Screen):
     def check_for_selection(self):
         if self.player_1.selected_diff_highlight_fade.is_finished and not audio.is_sound_playing(f'voice_start_song_{global_data.player_num}p') and self.game_transition is None:
             selected_song = self.navigator.get_current_item()
-            if not isinstance(selected_song, SongFile):
+            if not isinstance(selected_song, SongFile) and not isinstance(selected_song, SongFileOsu):
                 raise Exception("picked directory")
 
-            title = selected_song.tja.metadata.title.get(
+            title = selected_song.parser.metadata.title.get(
                 global_data.config['general']['language'], '')
-            subtitle = selected_song.tja.metadata.subtitle.get(
+            subtitle = selected_song.parser.metadata.subtitle.get(
                 global_data.config['general']['language'], '')
             self.game_transition = Transition(title, subtitle)
             self.game_transition.start()
@@ -358,12 +359,12 @@ class SongSelectScreen(Screen):
             if not isinstance(song, Directory) and song.box.is_open:
                 if self.demo_song is None and current_time >= song.box.wait + (83.33*3):
                     song.box.get_scores()
-                    if song.tja.metadata.wave.exists() and song.tja.metadata.wave.is_file():
-                        self.demo_song = audio.load_music_stream(song.tja.metadata.wave, 'demo_song')
+                    if song.parser.metadata.wave.exists() and song.parser.metadata.wave.is_file():
+                        self.demo_song = audio.load_music_stream(song.parser.metadata.wave, 'demo_song')
                         audio.play_music_stream(self.demo_song, 'music')
-                        audio.seek_music_stream(self.demo_song, song.tja.metadata.demostart)
+                        audio.seek_music_stream(self.demo_song, song.parser.metadata.demostart)
                         audio.stop_sound('bgm')
-                        logger.info(f"Demo song loaded and playing for {song.tja.metadata.title}")
+                        logger.info(f"Demo song loaded and playing for {song.parser.metadata.title}")
             if song.box.is_open:
                 current_box = song.box
                 if not isinstance(current_box, BackBox) and current_time >= song.box.wait + (83.33*3):
@@ -445,7 +446,7 @@ class SongSelectScreen(Screen):
 
         if self.state == State.BROWSING and self.navigator.items != []:
             curr_item = self.navigator.get_current_item()
-            if isinstance(curr_item, SongFile):
+            if isinstance(curr_item, SongFile) or isinstance(curr_item, SongFileOsu):
                 curr_item.box.draw_score_history()
 
         self.draw_overlay()
@@ -508,10 +509,10 @@ class SongSelectPlayer:
 
     def on_song_selected(self, selected_song):
         """Called when a song is selected"""
-        if Difficulty.URA not in selected_song.tja.metadata.course_data:
+        if Difficulty.URA not in selected_song.parser.metadata.course_data:
             self.is_ura = False
-        elif (Difficulty.URA in selected_song.tja.metadata.course_data and
-              Difficulty.ONI not in selected_song.tja.metadata.course_data):
+        elif (Difficulty.URA in selected_song.parser.metadata.course_data and
+              Difficulty.ONI not in selected_song.parser.metadata.course_data):
             self.is_ura = True
 
     def handle_input_browsing(self, last_moved, selected_item):
@@ -645,7 +646,7 @@ class SongSelectPlayer:
         if is_l_kat_pressed(self.player_num) or is_r_kat_pressed(self.player_num):
             audio.play_sound('kat', 'sound')
             selected_song = current_item
-            diffs = sorted(selected_song.tja.metadata.course_data)
+            diffs = sorted(selected_song.parser.metadata.course_data)
             prev_diff = self.selected_difficulty
             ret_val = None
 
