@@ -14,6 +14,7 @@ from raylib import SHADER_UNIFORM_VEC3
 from libs.animation import Animation, MoveAnimation
 from libs.audio import audio
 from libs.global_data import Crown, Difficulty, ScoreMethod
+from libs.parsers.osz import OsuParser
 from libs.texture import tex
 from libs.parsers.tja import TJAParser, test_encodings
 from libs.utils import OutlinedText, get_current_ms, global_data
@@ -208,13 +209,13 @@ class BackBox(BaseBox):
             self.yellow_box.draw(self, fade_override, is_ura, self.name)
 
 class SongBox(BaseBox):
-    def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, tja: TJAParser):
+    def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, tja: TJAParser | OsuParser):
         super().__init__(name, back_color, fore_color, texture_index)
         self.scores = dict()
         self.hash = dict()
         self.score_history = None
         self.history_wait = 0
-        self.tja = tja
+        self.parser = tja
         self.is_favorite = False
         self.yellow_box = None
 
@@ -226,8 +227,8 @@ class SongBox(BaseBox):
         with sqlite3.connect(global_data.score_db) as con:
             cursor = con.cursor()
             # Batch database query for all diffs at once
-            if self.tja.metadata.course_data:
-                hash_values = [self.hash[diff] for diff in self.tja.metadata.course_data if diff in self.hash]
+            if self.parser.metadata.course_data:
+                hash_values = [self.hash[diff] for diff in self.parser.metadata.course_data if diff in self.hash]
                 placeholders = ','.join('?' * len(hash_values))
 
                 batch_query = f"""
@@ -239,7 +240,7 @@ class SongBox(BaseBox):
 
                 hash_to_score = {row[0]: row[1:] for row in cursor.fetchall()}
 
-                for diff in self.tja.metadata.course_data:
+                for diff in self.parser.metadata.course_data:
                     if diff not in self.hash:
                         continue
                     diff_hash = self.hash[diff]
@@ -261,7 +262,7 @@ class SongBox(BaseBox):
             self.score_history = ScoreHistory(self.scores, current_time)
 
         if not is_open_prev and self.is_open:
-            self.yellow_box = YellowBox(False, tja=self.tja)
+            self.yellow_box = YellowBox(False, tja=self.parser)
             self.yellow_box.create_anim()
             self.wait = current_time
             if current_time >= self.history_wait + 3000:
@@ -275,7 +276,7 @@ class SongBox(BaseBox):
 
         self.name.draw(outline_color=self.fore_color, x=x + tex.skin_config["song_box_name"].x - int(self.name.texture.width / 2), y=y+tex.skin_config["song_box_name"].y, y2=min(self.name.texture.height, tex.skin_config["song_box_name"].height)-self.name.texture.height, fade=outer_fade_override)
 
-        if self.tja.ex_data.new:
+        if self.parser.ex_data.new:
             tex.draw_texture('yellow_box', 'ex_data_new_song_balloon', x=x, y=y, fade=outer_fade_override)
         valid_scores = {k: v for k, v in self.scores.items() if v is not None}
         if valid_scores:
@@ -296,6 +297,46 @@ class SongBox(BaseBox):
         if self.is_open and get_current_ms() >= self.wait + 83.33:
             if self.score_history is not None and get_current_ms() >= self.history_wait + 3000:
                 self.score_history.draw()
+
+class SongBoxOsu(SongBox):
+    def update(self, current_time: float, is_diff_select: bool):
+        super().update(current_time, is_diff_select)
+        is_open_prev = self.is_open
+        self.is_open = self.position == BOX_CENTER
+
+        if self.yellow_box is not None:
+            self.yellow_box.update(is_diff_select)
+
+        if self.history_wait == 0:
+            self.history_wait = current_time
+
+        if self.score_history is None and {k: v for k, v in self.scores.items() if v is not None}:
+            self.score_history = ScoreHistory(self.scores, current_time)
+
+        if not is_open_prev and self.is_open:
+            self.yellow_box = YellowBox(False)
+            self.yellow_box.create_anim()
+            self.wait = current_time
+            if current_time >= self.history_wait + 3000:
+                self.history_wait = current_time
+
+        if self.score_history is not None:
+            self.score_history.update(current_time)
+
+    def _draw_closed(self, x: float, y: float, outer_fade_override: float):
+        super()._draw_closed(x, y, outer_fade_override)
+
+        self.name.draw(outline_color=self.fore_color, x=x + tex.skin_config["song_box_name"].x - int(self.name.texture.width / 2), y=y+tex.skin_config["song_box_name"].y, y2=min(self.name.texture.height, tex.skin_config["song_box_name"].height)-self.name.texture.height, fade=outer_fade_override)
+        valid_scores = {k: v for k, v in self.scores.items() if v is not None}
+        if valid_scores:
+            highest_key = max(valid_scores.keys())
+            score = self.scores[highest_key]
+            if score and score[5] == Crown.DFC:
+                tex.draw_texture('yellow_box', 'crown_dfc', x=x, y=y, frame=min(Difficulty.URA, highest_key), fade=outer_fade_override)
+            elif score and score[5] == Crown.FC:
+                tex.draw_texture('yellow_box', 'crown_fc', x=x, y=y, frame=min(Difficulty.URA, highest_key), fade=outer_fade_override)
+            elif score and score[5] >= Crown.CLEAR:
+                tex.draw_texture('yellow_box', 'crown_clear', x=x, y=y, frame=min(Difficulty.URA, highest_key), fade=outer_fade_override)
 
 class FolderBox(BaseBox):
     def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, genre_index: GenreIndex, tja_count: int = 0, box_texture: Optional[str] = None):
@@ -387,12 +428,20 @@ class FolderBox(BaseBox):
             tex.draw_texture('yellow_box', 'song_count_songs', color=color)
             dest_width = min(tex.skin_config["song_tja_count"].width, self.tja_count_text.texture.width)
             self.tja_count_text.draw(outline_color=ray.BLACK, x=tex.skin_config["song_tja_count"].x - (dest_width//2), y=tex.skin_config["song_tja_count"].y, x2=dest_width-self.tja_count_text.texture.width, color=color)
-        if self.texture_index != TextureIndex.DEFAULT:
+        if self.texture_index != TextureIndex.DEFAULT and self.box_texture is None:
             tex.draw_texture('box', 'folder_graphic', color=color, frame=self.genre_index)
             tex.draw_texture('box', 'folder_text', color=color, frame=self.genre_index)
         elif self.box_texture is not None:
             scaled_width = self.box_texture.width * tex.screen_scale
             scaled_height = self.box_texture.height * tex.screen_scale
+            max_width = 344 * tex.screen_scale
+            max_height = 424 * tex.screen_scale
+            if scaled_width > max_width or scaled_height > max_height:
+                width_scale = max_width / scaled_width
+                height_scale = max_height / scaled_height
+                scale_factor = min(width_scale, height_scale)
+                scaled_width *= scale_factor
+                scaled_height *= scale_factor
             x = int((x + tex.skin_config["box_texture"].x) - (scaled_width // 2))
             y = int((y + tex.skin_config["box_texture"].y) - (scaled_height // 2))
             src = ray.Rectangle(0, 0, self.box_texture.width, self.box_texture.height)
@@ -401,7 +450,7 @@ class FolderBox(BaseBox):
 
 class YellowBox:
     """A song box when it is opened."""
-    def __init__(self, is_back: bool, tja: Optional[TJAParser] = None, is_dan: bool = False):
+    def __init__(self, is_back: bool, tja: Optional[TJAParser | OsuParser] = None, is_dan: bool = False):
         self.is_diff_select = False
         self.is_back = is_back
         self.tja = tja
@@ -1061,12 +1110,23 @@ class SongFile(FileSystemItem):
     def __init__(self, path: Path, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex):
         super().__init__(path, name)
         self.is_recent = (datetime.now() - datetime.fromtimestamp(path.stat().st_mtime)) <= timedelta(days=7)
-        self.tja = TJAParser(path)
+        self.parser = TJAParser(path)
         if self.is_recent:
-            self.tja.ex_data.new = True
-        title = self.tja.metadata.title.get(global_data.config['general']['language'].lower(), self.tja.metadata.title['en'])
+            self.parser.ex_data.new = True
+        title = self.parser.metadata.title.get(global_data.config['general']['language'].lower(), self.parser.metadata.title['en'])
         self.hash = global_data.song_paths[path]
-        self.box = SongBox(title, back_color, fore_color, texture_index, self.tja)
+        self.box = SongBox(title, back_color, fore_color, texture_index, self.parser)
+        self.box.hash = global_data.song_hashes[self.hash][0]["diff_hashes"]
+        self.box.get_scores()
+
+class SongFileOsu(FileSystemItem):
+    def __init__(self, path: Path, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex):
+        super().__init__(path, name)
+        self.is_recent = (datetime.now() - datetime.fromtimestamp(path.stat().st_mtime)) <= timedelta(days=7)
+        self.parser = OsuParser(path)
+        title = self.parser.osu_metadata["Version"]
+        self.hash = global_data.song_paths[path]
+        self.box = SongBoxOsu(title, back_color, fore_color, texture_index, self.parser)
         self.box.hash = global_data.song_hashes[self.hash][0]["diff_hashes"]
         self.box.get_scores()
 
@@ -1122,7 +1182,7 @@ class FileNavigator:
 
         # Pre-generated objects storage
         self.all_directories: dict[str, Directory] = {}  # path -> Directory
-        self.all_song_files: dict[str, Union[SongFile, DanCourse]] = {}    # path -> SongFile
+        self.all_song_files: dict[str, Union[SongFile, DanCourse, SongFileOsu]] = {}    # path -> SongFile
         self.directory_contents: dict[str, list[Union[Directory, SongFile]]] = {}  # path -> list of items
 
         # OPTION 2: Lazy crown calculation with caching
@@ -1262,6 +1322,10 @@ class FileNavigator:
             child_dirs = []
             for item_path in dir_path.iterdir():
                 if item_path.is_dir():
+                    child_has_osu = any(item_path.glob("*.osu"))
+                    if child_has_osu:
+                        child_dirs.append(item_path)
+                        self.process_osz(item_path)
                     child_has_box_def = (item_path / "box.def").exists()
                     if child_has_box_def:
                         child_dirs.append(item_path)
@@ -1289,8 +1353,8 @@ class FileNavigator:
                 elif song_key not in self.all_song_files and tja_path in global_data.song_paths:
                     song_obj = SongFile(tja_path, tja_path.name, back_color, fore_color, texture_index)
                     song_obj.box.get_scores()
-                    for course in song_obj.tja.metadata.course_data:
-                        level = song_obj.tja.metadata.course_data[course].level
+                    for course in song_obj.parser.metadata.course_data:
+                        level = song_obj.parser.metadata.course_data[course].level
 
                         scores = song_obj.box.scores.get(course)
                         if scores is not None:
@@ -1342,6 +1406,61 @@ class FileNavigator:
                         logger.error(f"Error creating SongFile for {tja_path}: {e}")
                         continue
 
+    def process_osz(self, dir_path: Path):
+        dir_key = str(dir_path)
+        if dir_path.iterdir():
+            name = dir_path.name
+            for file in dir_path.iterdir():
+                if file.name.endswith('.osu'):
+                    with open(file, 'r', encoding='utf-8') as f:
+                        content = f.readlines()
+                        for line in content:
+                            if line.startswith('TitleUnicode:'):
+                                title_unicode = line.split(':', 1)[1].strip()
+                                name = title_unicode
+                                break
+        else:
+            name = dir_path.name if dir_path.name else str(dir_path)
+        box_texture = None
+        collection = None
+        back_color = None
+        fore_color = None
+        texture_index = TextureIndex.DEFAULT
+        genre_index = GenreIndex.DEFAULT
+
+        for file in dir_path.iterdir():
+            if file.name.endswith('.jpg') or file.name.endswith('.png'):
+                box_texture = str(file)
+
+        # Create Directory object
+        file_count = len([file for file in dir_path.glob("*.osu")])
+        directory_obj = Directory(
+            dir_path, name, back_color, fore_color, texture_index, genre_index,
+            tja_count=file_count,
+            box_texture=box_texture,
+            collection=collection,
+        )
+        self.all_directories[dir_key] = directory_obj
+
+        content_items = []
+
+        osu_files = [file for file in dir_path.glob("*.osu")]
+
+        # Create SongFile objects
+        for osu_path in sorted(osu_files):
+            song_key = str(osu_path)
+            if song_key not in self.all_song_files and osu_path in global_data.song_paths:
+                song_obj = SongFileOsu(osu_path, osu_path.name, back_color, fore_color, texture_index)
+                song_obj.box.get_scores()
+                self.song_count += 1
+                global_data.song_progress = self.song_count / global_data.total_songs
+                self.all_song_files[song_key] = song_obj
+
+            if song_key in self.all_song_files:
+                content_items.append(self.all_song_files[song_key])
+
+        self.directory_contents[dir_key] = content_items
+
     def is_at_root(self) -> bool:
         """Check if currently at the virtual root"""
         return self.current_dir == Path()
@@ -1377,7 +1496,7 @@ class FileNavigator:
                 if sibling_key in self.directory_contents:
                     for item in self.directory_contents[sibling_key]:
                         if isinstance(item, SongFile) and item:
-                            if self.diff_sort_diff in item.tja.metadata.course_data and item.tja.metadata.course_data[self.diff_sort_diff].level == self.diff_sort_level:
+                            if self.diff_sort_diff in item.parser.metadata.course_data and item.parser.metadata.course_data[self.diff_sort_diff].level == self.diff_sort_level:
                                 if item not in content_items:
                                     content_items.append(item)
         return content_items
@@ -1425,7 +1544,7 @@ class FileNavigator:
             if self._levenshtein_distance(song.name[:-4].lower(), search_name.lower()) < 2:
                 items.append(song)
             if isinstance(song, SongFile):
-                if self._levenshtein_distance(song.tja.metadata.subtitle["en"].lower(), search_name.lower()) < 2:
+                if self._levenshtein_distance(song.parser.metadata.subtitle["en"].lower(), search_name.lower()) < 2:
                     items.append(song)
 
         return items
@@ -1784,7 +1903,7 @@ class FileNavigator:
                 else:
                     box.draw(box.position + int(move_away_attribute), tex.skin_config["boxes"].y, is_ura, inner_fade_override=diff_fade_out_attribute, outer_fade_override=fade)
 
-    def mark_crowns_dirty_for_song(self, song_file: SongFile):
+    def mark_crowns_dirty_for_song(self, song_file: SongFile | SongFileOsu):
         """Mark directories as needing crown recalculation when a song's score changes"""
         song_path = song_file.path
 
@@ -1847,7 +1966,7 @@ class FileNavigator:
             return
 
         recents_path = self.recent_folder.path / 'song_list.txt'
-        new_entry = f'{song.hash}|{song.tja.metadata.title["en"]}|{song.tja.metadata.subtitle["en"]}\n'
+        new_entry = f'{song.hash}|{song.parser.metadata.title["en"]}|{song.parser.metadata.subtitle["en"]}\n'
         existing_entries = []
         if recents_path.exists():
             with open(recents_path, 'r', encoding='utf-8-sig') as song_list:
@@ -1858,7 +1977,7 @@ class FileNavigator:
         with open(recents_path, 'w', encoding='utf-8-sig') as song_list:
             song_list.writelines(recent_entries)
 
-        logger.info(f"Added Recent: {song.hash} {song.tja.metadata.title['en']} {song.tja.metadata.subtitle['en']}")
+        logger.info(f"Added Recent: {song.hash} {song.parser.metadata.title['en']} {song.parser.metadata.subtitle['en']}")
 
     def add_favorite(self) -> bool:
         """Add the current song to the favorites list"""
@@ -1877,7 +1996,7 @@ class FileNavigator:
                 if not line:  # Skip empty lines
                     continue
                 hash, title, subtitle = line.split('|')
-                if song.hash == hash or (song.tja.metadata.title['en'] == title and song.tja.metadata.subtitle['en'] == subtitle):
+                if song.hash == hash or (song.parser.metadata.title['en'] == title and song.parser.metadata.subtitle['en'] == subtitle):
                     if not self.in_favorites:
                         return False
                 else:
@@ -1886,11 +2005,11 @@ class FileNavigator:
             with open(favorites_path, 'w', encoding='utf-8-sig') as song_list:
                 for line in lines:
                     song_list.write(line + '\n')
-            logger.info(f"Removed Favorite: {song.hash} {song.tja.metadata.title['en']} {song.tja.metadata.subtitle['en']}")
+            logger.info(f"Removed Favorite: {song.hash} {song.parser.metadata.title['en']} {song.parser.metadata.subtitle['en']}")
         else:
             with open(favorites_path, 'a', encoding='utf-8-sig') as song_list:
-                song_list.write(f'{song.hash}|{song.tja.metadata.title["en"]}|{song.tja.metadata.subtitle["en"]}\n')
-            logger.info(f"Added Favorite: {song.hash} {song.tja.metadata.title['en']} {song.tja.metadata.subtitle['en']}")
+                song_list.write(f'{song.hash}|{song.parser.metadata.title["en"]}|{song.parser.metadata.subtitle["en"]}\n')
+            logger.info(f"Added Favorite: {song.hash} {song.parser.metadata.title['en']} {song.parser.metadata.subtitle['en']}")
         return True
 
 navigator = FileNavigator()
