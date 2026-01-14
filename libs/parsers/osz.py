@@ -2,7 +2,7 @@ import hashlib
 import math
 from pathlib import Path
 
-from libs.parsers.tja import CourseData, Note, NoteType, Drumroll, Balloon, NoteList, TJAMetadata
+from libs.parsers.tja import CourseData, Note, NoteType, Drumroll, Balloon, NoteList, TJAEXData, TJAMetadata
 
 import re
 
@@ -11,33 +11,32 @@ class OsuParser:
     editor: dict[str, str]
     osu_metadata: dict[str, str]
     difficulty: dict[str, str]
-    events: list[int]
-    timing_points: list[int]
-    hit_objects: list[int]
+    events: list[list[float]]
+    timing_points: list[list[float]]
+    hit_objects: list[list[float]]
 
-    bpm: list[int]
+    bpm: list[float]
 
     def __init__(self, osu_file: Path):
-        self.general = self.read_osu_data(osu_file, target_header="General", is_dict=True)
-        self.editor = self.read_osu_data(osu_file, target_header="Editor", is_dict=True)
-        self.osu_metadata = self.read_osu_data(osu_file, target_header="Metadata", is_dict=True)
-        self.difficulty = self.read_osu_data(osu_file, target_header="Difficulty", is_dict=True)
-        self.events = self.read_osu_data(osu_file, target_header="Events")
-        self.timing_points = self.read_osu_data(osu_file, target_header="TimingPoints")
+        self.general = self.read_osu_data_dict(osu_file, target_header="General")
+        self.editor = self.read_osu_data_dict(osu_file, target_header="Editor")
+        self.osu_metadata = self.read_osu_data_dict(osu_file, target_header="Metadata")
+        self.difficulty = self.read_osu_data_dict(osu_file, target_header="Difficulty")
+        self.events = self.read_osu_data_list(osu_file, target_header="Events")
+        self.timing_points = self.read_osu_data_list(osu_file, target_header="TimingPoints")
         #self.general = self.read_osu_data(osu_file, target_header="Colours", is_dict=True)
-        self.hit_objects = self.read_osu_data(osu_file, target_header="HitObjects")
+        self.hit_objects = self.read_osu_data_list(osu_file, target_header="HitObjects")
         self.bpm = []
         self.metadata = TJAMetadata()
         self.metadata.wave = osu_file.parent / self.general["AudioFilename"]
         self.metadata.course_data[0] = CourseData()
+        self.ex_data = TJAEXData()
         for points in self.timing_points:
             self.bpm.append(math.floor(1 / points[1] * 1000 * 60))
         self.osu_NoteList = self.note_data_to_NoteList(self.hit_objects)
 
-    def read_osu_data(self, file_path: Path, target_header="HitObjects", is_dict = False):
+    def read_osu_data_list(self, file_path: Path, target_header="HitObjects") -> list[list[float]]:
         data = []
-        if is_dict:
-            data = {}
         current_header = None
 
         with file_path.open(mode='r', encoding='utf-8') as f:
@@ -55,6 +54,24 @@ class OsuParser:
                         int_array = [float(num_str) for num_str in string_array]
                         data.append(int_array)
 
+                else:
+                    continue
+
+        return data
+
+    def read_osu_data_dict(self, file_path: Path, target_header="HitObjects") -> dict[str, str]:
+        data = dict()
+        current_header = None
+
+        with file_path.open(mode='r', encoding='utf-8') as f:
+
+            for line in f:
+                line = line.rstrip("\n")
+
+                if re.match(r"\[\w*\]", line): # header pattern
+                    current_header = line[1:-1]
+
+                if current_header == target_header:
                     if re.match(r'(\w*)\:\s?(\w*.?\w*)', line): # General, Editor, Metadata, Difficulty
                         match = re.search(r'(\w*)\:\s?(\w*.?\w*)', line)
                         if match:
@@ -216,11 +233,13 @@ class OsuParser:
                 counter = counter + 1
                 balloon.moji = 0
 
+                '''
                 od = int(self.difficulty["OverallDifficulty"])
                 # thank you https://github.com/IepIweidieng/osu2tja/blob/dev-iid/osu2tja/osu2tja.py
                 hit_multiplyer = (5 - 2 * (5 - od) / 5 if od < 5
                                 else 5 + 2.5 * (od - 5) / 5 if od > 5
                                 else 5) * 1.65
+                '''
                 balloon.count = 20#int(max(1, (ret[-1][1] - ret[-2][1]) / 1000 * hit_multiplier))
                 # end of 'stolen' code
                 source.index = counter

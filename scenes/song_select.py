@@ -102,7 +102,7 @@ class SongSelectScreen(Screen):
                 self.navigator.mark_crowns_dirty_for_song(selected_song)
 
         curr_item = self.navigator.get_current_item()
-        if isinstance(curr_item, SongFile) or isinstance(curr_item, SongFileOsu):
+        if not isinstance(curr_item, Directory):
             curr_item.box.get_scores()
         self.navigator.add_recent()
 
@@ -446,7 +446,7 @@ class SongSelectScreen(Screen):
 
         if self.state == State.BROWSING and self.navigator.items != []:
             curr_item = self.navigator.get_current_item()
-            if isinstance(curr_item, SongFile) or isinstance(curr_item, SongFileOsu):
+            if not isinstance(curr_item, Directory):
                 curr_item.box.draw_score_history()
 
         self.draw_overlay()

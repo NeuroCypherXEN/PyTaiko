@@ -209,7 +209,7 @@ class BackBox(BaseBox):
             self.yellow_box.draw(self, fade_override, is_ura, self.name)
 
 class SongBox(BaseBox):
-    def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, tja: TJAParser):
+    def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, tja: TJAParser | OsuParser):
         super().__init__(name, back_color, fore_color, texture_index)
         self.scores = dict()
         self.hash = dict()
@@ -298,45 +298,7 @@ class SongBox(BaseBox):
             if self.score_history is not None and get_current_ms() >= self.history_wait + 3000:
                 self.score_history.draw()
 
-class SongBoxOsu(BaseBox):
-    def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, parser: OsuParser):
-        super().__init__(name, back_color, fore_color, texture_index)
-        self.scores = dict()
-        self.hash = dict()
-        self.score_history = None
-        self.history_wait = 0
-        self.parser = parser
-        self.is_favorite = False
-        self.yellow_box = None
-
-    def load_text(self):
-        super().load_text()
-        self.text_loaded = True
-
-    def get_scores(self):
-        with sqlite3.connect(global_data.score_db) as con:
-            cursor = con.cursor()
-            # Batch database query for all diffs at once
-            if self.parser.metadata.course_data:
-                hash_values = [self.hash[diff] for diff in self.parser.metadata.course_data if diff in self.hash]
-                placeholders = ','.join('?' * len(hash_values))
-
-                batch_query = f"""
-                    SELECT hash, score, good, ok, bad, drumroll, clear
-                    FROM Scores
-                    WHERE hash IN ({placeholders})
-                """
-                cursor.execute(batch_query, hash_values)
-
-                hash_to_score = {row[0]: row[1:] for row in cursor.fetchall()}
-
-                for diff in self.parser.metadata.course_data:
-                    if diff not in self.hash:
-                        continue
-                    diff_hash = self.hash[diff]
-                    self.scores[diff] = hash_to_score.get(diff_hash)
-                self.score_history = None
-
+class SongBoxOsu(SongBox):
     def update(self, current_time: float, is_diff_select: bool):
         super().update(current_time, is_diff_select)
         is_open_prev = self.is_open
@@ -375,11 +337,6 @@ class SongBoxOsu(BaseBox):
                 tex.draw_texture('yellow_box', 'crown_fc', x=x, y=y, frame=min(Difficulty.URA, highest_key), fade=outer_fade_override)
             elif score and score[5] >= Crown.CLEAR:
                 tex.draw_texture('yellow_box', 'crown_clear', x=x, y=y, frame=min(Difficulty.URA, highest_key), fade=outer_fade_override)
-
-    def draw_score_history(self):
-        if self.is_open and get_current_ms() >= self.wait + 83.33:
-            if self.score_history is not None and get_current_ms() >= self.history_wait + 3000:
-                self.score_history.draw()
 
 class FolderBox(BaseBox):
     def __init__(self, name: str, back_color: Optional[tuple[int, int, int]], fore_color: Optional[tuple[int, int, int]], texture_index: TextureIndex, genre_index: GenreIndex, tja_count: int = 0, box_texture: Optional[str] = None):
@@ -493,7 +450,7 @@ class FolderBox(BaseBox):
 
 class YellowBox:
     """A song box when it is opened."""
-    def __init__(self, is_back: bool, tja: Optional[TJAParser] = None, is_dan: bool = False):
+    def __init__(self, is_back: bool, tja: Optional[TJAParser | OsuParser] = None, is_dan: bool = False):
         self.is_diff_select = False
         self.is_back = is_back
         self.tja = tja
