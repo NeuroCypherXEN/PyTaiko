@@ -90,7 +90,7 @@ class DanGameScreen(GameScreen):
         self.player_1.is_dan = True
         self.player_1.gauge = DanGauge(global_data.player_num, self.total_notes)
         self.song_info = SongInfo(song.metadata.title.get(global_data.config["general"]["language"], "en"), genre_index)
-        self.bpm = self.tja.metadata.bpm
+        self.bpm = self.parser.metadata.bpm
         logger.info(f"TJA initialized for song: {song.file_path}")
 
 
@@ -103,19 +103,19 @@ class DanGameScreen(GameScreen):
         song, genre_index, difficulty, level = songs[self.song_index]
         session_data.selected_difficulty = difficulty
         self.player_1.difficulty = difficulty
-        self.tja = TJAParser(song.file_path, start_delay=self.start_delay)
+        self.parser = TJAParser(song.file_path, start_delay=self.start_delay)
         if self.song_music is not None:
             audio.unload_music_stream(self.song_music)
         self.song_music = None
         self.song_started = False
 
-        if self.tja.metadata.wave.exists() and self.tja.metadata.wave.is_file() and self.song_music is None:
-            self.song_music = audio.load_music_stream(self.tja.metadata.wave, 'song')
-        self.player_1.parser = self.tja
+        if self.parser.metadata.wave.exists() and self.parser.metadata.wave.is_file() and self.song_music is None:
+            self.song_music = audio.load_music_stream(self.parser.metadata.wave, 'song')
+        self.player_1.parser = self.parser
         self.player_1.reset_chart()
         self.dan_transition.start()
-        self.song_info = SongInfo(self.tja.metadata.title.get(global_data.config["general"]["language"], "en"), genre_index)
-        self.start_ms = (get_current_ms() - self.tja.metadata.offset*1000)
+        self.song_info = SongInfo(self.parser.metadata.title.get(global_data.config["general"]["language"], "en"), genre_index)
+        self.start_ms = (get_current_ms() - self.parser.metadata.offset*1000)
 
     def _calculate_dan_info(self):
         """Calculate all dan info data for drawing"""
@@ -205,7 +205,7 @@ class DanGameScreen(GameScreen):
         if self.transition.is_finished and self.dan_transition.is_finished:
             self.start_song(self.current_ms)
         else:
-            self.start_ms = current_time - self.tja.metadata.offset*1000
+            self.start_ms = current_time - self.parser.metadata.offset*1000
         self.update_background(current_time)
 
         if self.song_music is not None:

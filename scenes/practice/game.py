@@ -46,16 +46,16 @@ class PracticeGameScreen(GameScreen):
 
     def init_tja(self, song: Path):
         """Initialize the TJA file"""
-        self.tja = TJAParser(song, start_delay=self.start_delay)
+        self.parser = TJAParser(song, start_delay=self.start_delay)
         self.scrobbling_tja = TJAParser(song, start_delay=self.start_delay)
-        global_data.session_data[global_data.player_num].song_title = self.tja.metadata.title.get(global_data.config['general']['language'].lower(), self.tja.metadata.title['en'])
-        if self.tja.metadata.wave.exists() and self.tja.metadata.wave.is_file() and self.song_music is None:
-            self.song_music = audio.load_music_stream(self.tja.metadata.wave, 'song')
-        self.player_1 = PracticePlayer(self.tja, global_data.player_num, global_data.session_data[global_data.player_num].selected_difficulty, False, global_data.modifiers[global_data.player_num])
-        notes, branch_m, branch_e, branch_n = self.tja.notes_to_position(self.player_1.difficulty)
+        global_data.session_data[global_data.player_num].song_title = self.parser.metadata.title.get(global_data.config['general']['language'].lower(), self.parser.metadata.title['en'])
+        if self.parser.metadata.wave.exists() and self.parser.metadata.wave.is_file() and self.song_music is None:
+            self.song_music = audio.load_music_stream(self.parser.metadata.wave, 'song')
+        self.player_1 = PracticePlayer(self.parser, global_data.player_num, global_data.session_data[global_data.player_num].selected_difficulty, False, global_data.modifiers[global_data.player_num])
+        notes, branch_m, branch_e, branch_n = self.parser.notes_to_position(self.player_1.difficulty)
         self.scrobble_timeline = notes.timeline
         _, self.scrobble_note_list, self.bars = apply_modifiers(notes, self.player_1.modifiers)
-        self.start_ms = (get_current_ms() - self.tja.metadata.offset*1000)
+        self.start_ms = (get_current_ms() - self.parser.metadata.offset*1000)
         self.scrobble_index = 0
         self.scrobble_time = self.bars[self.scrobble_index].hit_ms
         self.scrobble_move = Animation.create_move(200, total_distance=0)
@@ -110,7 +110,7 @@ class PracticeGameScreen(GameScreen):
 
             self.pause_time = start_time
             audio.play_music_stream(self.song_music, 'music')
-            audio.seek_music_stream(self.song_music, (self.pause_time - self.start_delay)/1000 - self.tja.metadata.offset)
+            audio.seek_music_stream(self.song_music, (self.pause_time - self.start_delay)/1000 - self.parser.metadata.offset)
             self.song_started = True
             self.start_ms = get_current_ms() - self.pause_time
 
@@ -156,7 +156,7 @@ class PracticeGameScreen(GameScreen):
         if self.transition.is_finished:
             self.start_song(self.current_ms)
         else:
-            self.start_ms = current_time - self.tja.metadata.offset*1000
+            self.start_ms = current_time - self.parser.metadata.offset*1000
         self.update_background(current_time)
 
         if self.song_music is not None:

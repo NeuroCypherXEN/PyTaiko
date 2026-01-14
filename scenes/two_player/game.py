@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class TwoPlayerGameScreen(GameScreen):
     def on_screen_start(self):
         super().on_screen_start()
-        scene_preset = self.tja.metadata.scene_preset
+        scene_preset = self.parser.metadata.scene_preset
         if self.background is not None:
             self.background.unload()
         self.background = Background(PlayerNum.TWO_PLAYER, self.bpm, scene_preset=scene_preset)
@@ -83,20 +83,20 @@ class TwoPlayerGameScreen(GameScreen):
 
     def init_tja(self, song: Path):
         """Initialize the TJA file"""
-        self.tja = TJAParser(song, start_delay=self.start_delay)
-        if self.tja.metadata.bgmovie != Path() and self.tja.metadata.bgmovie.exists():
-            self.movie = VideoPlayer(self.tja.metadata.bgmovie)
+        self.parser = TJAParser(song, start_delay=self.start_delay)
+        if self.parser.metadata.bgmovie != Path() and self.parser.metadata.bgmovie.exists():
+            self.movie = VideoPlayer(self.parser.metadata.bgmovie)
             self.movie.set_volume(0.0)
         else:
             self.movie = None
-        global_data.session_data[PlayerNum.P1].song_title = self.tja.metadata.title.get(global_data.config['general']['language'].lower(), self.tja.metadata.title['en'])
-        if self.tja.metadata.wave.exists() and self.tja.metadata.wave.is_file() and self.song_music is None:
-            self.song_music = audio.load_music_stream(self.tja.metadata.wave, 'song')
+        global_data.session_data[PlayerNum.P1].song_title = self.parser.metadata.title.get(global_data.config['general']['language'].lower(), self.parser.metadata.title['en'])
+        if self.parser.metadata.wave.exists() and self.parser.metadata.wave.is_file() and self.song_music is None:
+            self.song_music = audio.load_music_stream(self.parser.metadata.wave, 'song')
 
-        tja_copy = copy.deepcopy(self.tja)
-        self.player_1 = Player(self.tja, PlayerNum.P1, global_data.session_data[PlayerNum.P1].selected_difficulty, False, global_data.modifiers[PlayerNum.P1])
+        tja_copy = copy.deepcopy(self.parser)
+        self.player_1 = Player(self.parser, PlayerNum.P1, global_data.session_data[PlayerNum.P1].selected_difficulty, False, global_data.modifiers[PlayerNum.P1])
         self.player_2 = Player(tja_copy, PlayerNum.P2, global_data.session_data[PlayerNum.P2].selected_difficulty, True, global_data.modifiers[PlayerNum.P2])
-        self.start_ms = (get_current_ms() - self.tja.metadata.offset*1000)
+        self.start_ms = (get_current_ms() - self.parser.metadata.offset*1000)
         logger.info(f"TJA initialized for two-player song: {song}")
 
     def spawn_ending_anims(self):
@@ -122,7 +122,7 @@ class TwoPlayerGameScreen(GameScreen):
         if self.transition.is_finished:
             self.start_song(self.current_ms)
         else:
-            self.start_ms = current_time - self.tja.metadata.offset*1000
+            self.start_ms = current_time - self.parser.metadata.offset*1000
         self.update_background(current_time)
 
         if self.song_music is not None:

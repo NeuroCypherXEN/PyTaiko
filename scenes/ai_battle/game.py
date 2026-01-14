@@ -100,21 +100,21 @@ class AIBattleGameScreen(GameScreen):
 
     def init_tja(self, song: Path):
         """Initialize the TJA file"""
-        self.tja = TJAParser(song, start_delay=self.start_delay)
+        self.parser = TJAParser(song, start_delay=self.start_delay)
         self.movie = None
         session_data = global_data.session_data[global_data.player_num]
-        session_data.song_title = self.tja.metadata.title.get(global_data.config['general']['language'].lower(), self.tja.metadata.title['en'])
-        if self.tja.metadata.wave.exists() and self.tja.metadata.wave.is_file() and self.song_music is None:
-            self.song_music = audio.load_music_stream(self.tja.metadata.wave, 'song')
+        session_data.song_title = self.parser.metadata.title.get(global_data.config['general']['language'].lower(), self.parser.metadata.title['en'])
+        if self.parser.metadata.wave.exists() and self.parser.metadata.wave.is_file() and self.song_music is None:
+            self.song_music = audio.load_music_stream(self.parser.metadata.wave, 'song')
 
-        tja_copy = copy.deepcopy(self.tja)
-        self.player_1 = PlayerNoChara(self.tja, global_data.player_num, session_data.selected_difficulty, False, global_data.modifiers[global_data.player_num])
-        self.player_1.gauge = AIGauge(self.player_1.player_num, self.player_1.difficulty, self.tja.metadata.course_data[self.player_1.difficulty].level, self.player_1.total_notes, self.player_1.is_2p)
+        tja_copy = copy.deepcopy(self.parser)
+        self.player_1 = PlayerNoChara(self.parser, global_data.player_num, session_data.selected_difficulty, False, global_data.modifiers[global_data.player_num])
+        self.player_1.gauge = AIGauge(self.player_1.player_num, self.player_1.difficulty, self.parser.metadata.course_data[self.player_1.difficulty].level, self.player_1.total_notes, self.player_1.is_2p)
         ai_modifiers = copy.deepcopy(global_data.modifiers[global_data.player_num])
         ai_modifiers.auto = True
         self.player_2 = AIPlayer(tja_copy, PlayerNum.AI, session_data.selected_difficulty, True, ai_modifiers, AIDifficulty.LVL_2)
-        self.start_ms = (get_current_ms() - self.tja.metadata.offset*1000)
-        self.precise_start = time.time() - self.tja.metadata.offset
+        self.start_ms = (get_current_ms() - self.parser.metadata.offset*1000)
+        self.precise_start = time.time() - self.parser.metadata.offset
         self.total_notes = len(self.player_1.don_notes) + len(self.player_1.kat_notes)
         logger.info(f"TJA initialized for two-player song: {song}")
 
@@ -140,7 +140,7 @@ class AIBattleGameScreen(GameScreen):
         if self.transition.is_finished:
             self.start_song(self.current_ms)
         else:
-            self.start_ms = current_time - self.tja.metadata.offset*1000
+            self.start_ms = current_time - self.parser.metadata.offset*1000
         self.update_background(current_time)
 
         self.update_audio(self.current_ms)
