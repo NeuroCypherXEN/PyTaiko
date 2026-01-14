@@ -27,6 +27,7 @@ class OsuParser:
         #self.general = self.read_osu_data(osu_file, target_header="Colours", is_dict=True)
         self.hit_objects = self.read_osu_data_list(osu_file, target_header="HitObjects")
         self.bpm = []
+        self.slider_multiplier = float(self.difficulty["SliderMultiplier"])
         self.metadata = TJAMetadata()
         self.metadata.wave = osu_file.parent / self.general["AudioFilename"]
         self.metadata.course_data[0] = CourseData()
@@ -82,18 +83,37 @@ class OsuParser:
 
         return data
 
+    def get_scroll_multiplier(self, ms: float) -> float:
+        base_scroll = (1.0 if 1.37 <= self.slider_multiplier <= 1.47
+                       else self.slider_multiplier / 1.40)
+        current_scroll = 1.0
+
+        for tp in self.timing_points:
+            time = tp[0]
+            beat_length = tp[1]  # positive for BPM, negative for scroll
+
+            if time > ms:
+                break
+
+            if beat_length < 0:  # This is an inherited (green) timing point
+                current_scroll = -100.0 / beat_length
+
+        return current_scroll * base_scroll
+
     def note_data_to_NoteList(self, note_data) -> tuple[NoteList, list[NoteList], list[NoteList], list[NoteList]]:
         osu_NoteList = NoteList()
         counter = 0
 
         for line in note_data:
+            note_time = line[2]
+            scroll = self.get_scroll_multiplier(note_time)
 
             if (line[3] == 1 or line[3] == 4 or line[3] == 5 or line[3] == 6) and line[4] == 0: # DON
                 don = Note()
                 don.type = NoteType(1)
                 don.hit_ms = line[2]
                 don.bpm = self.bpm[0]
-                don.scroll_x = 1
+                don.scroll_x = scroll
                 don.scroll_y = 0
                 don.display = True
                 don.index = counter
@@ -107,7 +127,7 @@ class OsuParser:
                 kat.type = NoteType(2)
                 kat.hit_ms = line[2]
                 kat.bpm = self.bpm[0]
-                kat.scroll_x = 1
+                kat.scroll_x = scroll
                 kat.scroll_y = 0
                 kat.display = True
                 kat.index = counter
@@ -121,7 +141,7 @@ class OsuParser:
                 don.type = NoteType(3)
                 don.hit_ms = line[2]
                 don.bpm = self.bpm[0]
-                don.scroll_x = 1
+                don.scroll_x = scroll
                 don.scroll_y = 0
                 don.display = True
                 don.index = counter
@@ -135,7 +155,7 @@ class OsuParser:
                 kat.type = NoteType(4)
                 kat.hit_ms = line[2]
                 kat.bpm = self.bpm[0]
-                kat.scroll_x = 1
+                kat.scroll_x = scroll
                 kat.scroll_y = 0
                 kat.display = True
                 kat.index = counter
@@ -154,7 +174,7 @@ class OsuParser:
                 source.type = NoteType(8)
                 source.hit_ms = line[2] + slider_time
                 source.bpm = self.bpm[0]
-                source.scroll_x = 1
+                source.scroll_x = scroll
                 source.scroll_y = 0
                 source.display = True
                 # this is where the index would be if it wasn't a tail note
@@ -165,7 +185,7 @@ class OsuParser:
                 slider.type = NoteType(5)
                 slider.hit_ms = line[2]
                 slider.bpm = self.bpm[0]
-                slider.scroll_x = 1
+                slider.scroll_x = scroll
                 slider.scroll_y = 0
                 slider.display = True
                 slider.index = counter
@@ -187,7 +207,7 @@ class OsuParser:
                 source.type = NoteType(8)
                 source.hit_ms = line[2] + slider_time
                 source.bpm = self.bpm[0]
-                source.scroll_x = 1
+                source.scroll_x = scroll
                 source.scroll_y = 0
                 source.display = True
                 # this is where the index would be if it wasn't a tail note
@@ -198,7 +218,7 @@ class OsuParser:
                 slider.type = NoteType(6)
                 slider.hit_ms = line[2]
                 slider.bpm = self.bpm[0]
-                slider.scroll_x = 1
+                slider.scroll_x = scroll
                 slider.scroll_y = 0
                 slider.display = True
                 slider.index = counter
@@ -215,7 +235,7 @@ class OsuParser:
                 source.type = NoteType(8)
                 source.hit_ms = line[5]
                 source.bpm = self.bpm[0]
-                source.scroll_x = 1
+                source.scroll_x = scroll
                 source.scroll_y = 0
                 source.display = True
                 #source.index = counter
@@ -226,7 +246,7 @@ class OsuParser:
                 balloon.type = NoteType(7)
                 balloon.hit_ms = line[2]
                 balloon.bpm = self.bpm[0]
-                balloon.scroll_x = 1
+                balloon.scroll_x = scroll
                 balloon.scroll_y = 0
                 balloon.display = True
                 balloon.index = counter
@@ -236,7 +256,7 @@ class OsuParser:
                 '''
                 od = int(self.difficulty["OverallDifficulty"])
                 # thank you https://github.com/IepIweidieng/osu2tja/blob/dev-iid/osu2tja/osu2tja.py
-                hit_multiplyer = (5 - 2 * (5 - od) / 5 if od < 5
+                hit_multiplier = (5 - 2 * (5 - od) / 5 if od < 5
                                 else 5 + 2.5 * (od - 5) / 5 if od > 5
                                 else 5) * 1.65
                 '''
