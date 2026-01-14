@@ -428,7 +428,7 @@ class FolderBox(BaseBox):
             tex.draw_texture('yellow_box', 'song_count_songs', color=color)
             dest_width = min(tex.skin_config["song_tja_count"].width, self.tja_count_text.texture.width)
             self.tja_count_text.draw(outline_color=ray.BLACK, x=tex.skin_config["song_tja_count"].x - (dest_width//2), y=tex.skin_config["song_tja_count"].y, x2=dest_width-self.tja_count_text.texture.width, color=color)
-        if self.texture_index != TextureIndex.DEFAULT:
+        if self.texture_index != TextureIndex.DEFAULT and self.box_texture is None:
             tex.draw_texture('box', 'folder_graphic', color=color, frame=self.genre_index)
             tex.draw_texture('box', 'folder_text', color=color, frame=self.genre_index)
         elif self.box_texture is not None:

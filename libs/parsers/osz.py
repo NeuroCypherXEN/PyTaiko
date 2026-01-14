@@ -29,6 +29,13 @@ class OsuParser:
         self.slider_multiplier = float(self.difficulty["SliderMultiplier"])
         self.metadata = TJAMetadata()
         self.metadata.wave = osu_file.parent / self.general["AudioFilename"]
+        self.metadata.demostart = float(self.general["PreviewTime"]) / 1000
+        self.metadata.offset = -30/1000
+        self.metadata.title["en"] = self.osu_metadata["Version"]
+        self.metadata.subtitle["en"] = self.osu_metadata["Creator"]
+        match = re.search(r'\[Events\][\s\S]*?^[ \t]*(\d+),(\d+),"([^"]+)"', osu_file.read_text(), re.MULTILINE)
+        if match:
+            self.metadata.bgmovie = osu_file.parent / Path(match.group(3))
         self.metadata.course_data[0] = CourseData()
         self.ex_data = TJAEXData()
         self.bpm = []
