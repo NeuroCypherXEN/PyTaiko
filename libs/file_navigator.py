@@ -1451,17 +1451,19 @@ class FileNavigator:
 
     def process_osz(self, dir_path: Path):
         dir_key = str(dir_path)
-        for file in dir_path.iterdir():
-            if file.name.endswith('.osu'):
-                with open(file, 'r', encoding='utf-8') as f:
-                    content = f.readlines()
-                    for line in content:
-                        if line.startswith('TitleUnicode:'):
-                            title_unicode = line.split(':', 1)[1].strip()
-                            name = title_unicode
-                            break
-            else:
-                name = dir_path.name if dir_path.name else str(dir_path)
+        if dir_path.iterdir():
+            name = dir_path.name
+            for file in dir_path.iterdir():
+                if file.name.endswith('.osu'):
+                    with open(file, 'r', encoding='utf-8') as f:
+                        content = f.readlines()
+                        for line in content:
+                            if line.startswith('TitleUnicode:'):
+                                title_unicode = line.split(':', 1)[1].strip()
+                                name = title_unicode
+                                break
+        else:
+            name = dir_path.name if dir_path.name else str(dir_path)
         box_texture = None
         collection = None
         back_color = None
