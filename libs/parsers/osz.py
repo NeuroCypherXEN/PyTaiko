@@ -2,7 +2,7 @@ import hashlib
 import math
 from pathlib import Path
 
-from libs.parsers.tja import CourseData, Note, NoteType, Drumroll, Balloon, NoteList, TJAEXData, TJAMetadata
+from libs.parsers.tja import CourseData, Note, NoteType, Drumroll, Balloon, NoteList, TJAEXData, TJAMetadata, TimelineObject
 
 import re
 
@@ -26,15 +26,21 @@ class OsuParser:
         self.timing_points = self.read_osu_data_list(osu_file, target_header="TimingPoints")
         #self.general = self.read_osu_data(osu_file, target_header="Colours", is_dict=True)
         self.hit_objects = self.read_osu_data_list(osu_file, target_header="HitObjects")
-        self.bpm = []
         self.slider_multiplier = float(self.difficulty["SliderMultiplier"])
         self.metadata = TJAMetadata()
         self.metadata.wave = osu_file.parent / self.general["AudioFilename"]
         self.metadata.course_data[0] = CourseData()
         self.ex_data = TJAEXData()
+        self.bpm = []
         for points in self.timing_points:
             self.bpm.append(math.floor(1 / points[1] * 1000 * 60))
         self.osu_NoteList = self.note_data_to_NoteList(self.hit_objects)
+        for points in self.timing_points:
+            if points[1] > 0:
+                obj = TimelineObject()
+                obj.hit_ms = points[0]
+                obj.bpm = math.floor(1 / points[1] * 1000 * 60)
+                self.osu_NoteList[0].timeline.append(obj)
 
     def read_osu_data_list(self, file_path: Path, target_header="HitObjects") -> list[list[float]]:
         data = []
@@ -73,10 +79,9 @@ class OsuParser:
                     current_header = line[1:-1]
 
                 if current_header == target_header:
-                    if re.match(r'(\w*)\:\s?(\w*.?\w*)', line): # General, Editor, Metadata, Difficulty
-                        match = re.search(r'(\w*)\:\s?(\w*.?\w*)', line)
-                        if match:
-                            data[match.group(1)] = match.group(2)
+                    if ':' in line and not line.startswith('['):
+                        key, value = line.split(':', 1)
+                        data[key.strip()] = value.strip()
 
                 else:
                     continue

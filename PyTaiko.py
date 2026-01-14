@@ -265,7 +265,7 @@ def check_args():
             selected_difficulty = args.difficulty
         else:
             if not tja.metadata.course_data:
-                selected_difficulty = Difficulty.ONI
+                selected_difficulty = Difficulty.EASY
             else:
                 selected_difficulty = max(tja.metadata.course_data.keys())
         current_screen = Screens.GAME_PRACTICE if args.practice else Screens.GAME
