@@ -108,8 +108,10 @@ def build_song_hashes(output_dir=Path("cache")):
         root_path = Path(root_dir)
         found_tja_files = root_path.rglob("*.tja", recurse_symlinks=True)
         found_osz_files = root_path.rglob("*.osz", recurse_symlinks=True)
+        found_osu_files = root_path.rglob("*.osu", recurse_symlinks=True)
         all_tja_files.extend(found_tja_files)
         all_tja_files.extend(found_osz_files)
+        all_tja_files.extend(found_osu_files)
 
     global_data.total_songs = len(all_tja_files)
     files_to_process = []
@@ -119,8 +121,10 @@ def build_song_hashes(output_dir=Path("cache")):
             with zipfile.ZipFile(tja_path, 'r') as zip_file:
                 zip_file.extractall(tja_path.with_suffix(''))
             zip_path = Path(tja_path.with_suffix(''))
+            tja_path.unlink()
             for file in zip_path.glob('*.osu'):
                 files_to_process.append(file)
+            continue
         tja_path_str = str(tja_path)
         current_modified = tja_path.stat().st_mtime
         if current_modified <= saved_timestamp:
