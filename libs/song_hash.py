@@ -5,9 +5,11 @@ import logging
 import sqlite3
 import time
 from pathlib import Path
+import zipfile
 
 from libs.config import get_config
 from libs.global_data import Crown
+from libs.parsers.osz import OsuParser
 from libs.parsers.tja import NoteList, TJAParser, test_encodings
 from libs.utils import global_data
 
@@ -105,12 +107,24 @@ def build_song_hashes(output_dir=Path("cache")):
     for root_dir in tja_paths:
         root_path = Path(root_dir)
         found_tja_files = root_path.rglob("*.tja", recurse_symlinks=True)
+        found_osz_files = root_path.rglob("*.osz", recurse_symlinks=True)
+        found_osu_files = root_path.rglob("*.osu", recurse_symlinks=True)
         all_tja_files.extend(found_tja_files)
+        all_tja_files.extend(found_osz_files)
+        all_tja_files.extend(found_osu_files)
 
     global_data.total_songs = len(all_tja_files)
     files_to_process = []
 
     for tja_path in all_tja_files:
+        if tja_path.suffix == '.osz':
+            with zipfile.ZipFile(tja_path, 'r') as zip_file:
+                zip_file.extractall(tja_path.with_suffix(''))
+            zip_path = Path(tja_path.with_suffix(''))
+            tja_path.unlink()
+            for file in zip_path.glob('*.osu'):
+                files_to_process.append(file)
+            continue
         tja_path_str = str(tja_path)
         current_modified = tja_path.stat().st_mtime
         if current_modified <= saved_timestamp:
@@ -133,56 +147,64 @@ def build_song_hashes(output_dir=Path("cache")):
         global_data.total_songs = total_songs
 
     for tja_path in files_to_process:
-        try:
-            tja_path_str = str(tja_path)
+        if tja_path.suffix == '.osu':
+            parser = OsuParser(tja_path)
+            path_str = str(tja_path)
             current_modified = tja_path.stat().st_mtime
-            tja = TJAParser(tja_path)
-            all_notes = NoteList()
             diff_hashes = dict()
+            all_notes = parser.notes_to_position(0)[0]
+            diff_hashes[0] = parser.hash_note_data(all_notes)
+        else:
+            try:
+                path_str = str(tja_path)
+                current_modified = tja_path.stat().st_mtime
+                parser = TJAParser(tja_path)
+                all_notes = NoteList()
+                diff_hashes = dict()
 
-            for diff in tja.metadata.course_data:
-                diff_notes, branch_m, branch_e, branch_n = TJAParser.notes_to_position(TJAParser(tja.file_path), diff)
-                diff_hashes[diff] = tja.hash_note_data(diff_notes)
-                all_notes.play_notes.extend(diff_notes.play_notes)
-                if branch_m:
-                    for branch in branch_m:
-                        all_notes.play_notes.extend(branch.play_notes)
-                        all_notes.bars.extend(branch.bars)
-                if branch_e:
-                    for branch in branch_e:
-                        all_notes.play_notes.extend(branch.play_notes)
-                        all_notes.bars.extend(branch.bars)
-                if branch_n:
-                    for branch in branch_n:
-                        all_notes.play_notes.extend(branch.play_notes)
-                        all_notes.bars.extend(branch.bars)
-                all_notes.bars.extend(diff_notes.bars)
-        except Exception as e:
-            logger.error(f"Failed to parse TJA {tja_path}: {e}")
-            continue
+                for diff in parser.metadata.course_data:
+                    diff_notes, branch_m, branch_e, branch_n = TJAParser.notes_to_position(TJAParser(parser.file_path), diff)
+                    diff_hashes[diff] = parser.hash_note_data(diff_notes)
+                    all_notes.play_notes.extend(diff_notes.play_notes)
+                    if branch_m:
+                        for branch in branch_m:
+                            all_notes.play_notes.extend(branch.play_notes)
+                            all_notes.bars.extend(branch.bars)
+                    if branch_e:
+                        for branch in branch_e:
+                            all_notes.play_notes.extend(branch.play_notes)
+                            all_notes.bars.extend(branch.bars)
+                    if branch_n:
+                        for branch in branch_n:
+                            all_notes.play_notes.extend(branch.play_notes)
+                            all_notes.bars.extend(branch.bars)
+                    all_notes.bars.extend(diff_notes.bars)
+            except Exception as e:
+                logger.error(f"Failed to parse TJA {tja_path}: {e}")
+                continue
 
         if all_notes == NoteList():
             continue
 
-        hash_val = tja.hash_note_data(all_notes)
+        hash_val = parser.hash_note_data(all_notes)
         if hash_val not in song_hashes:
             song_hashes[hash_val] = []
 
         song_hashes[hash_val].append({
-            "file_path": tja_path_str,
+            "file_path": path_str,
             "last_modified": current_modified,
-            "title": tja.metadata.title,
-            "subtitle": tja.metadata.subtitle,
+            "title": parser.metadata.title,
+            "subtitle": parser.metadata.subtitle,
             "diff_hashes": diff_hashes
         })
 
         # Update both indexes
-        path_to_hash[tja_path_str] = hash_val
+        path_to_hash[path_str] = hash_val
         global_data.song_paths[tja_path] = hash_val
 
         # Prepare database updates for each difficulty
-        en_name = tja.metadata.title.get('en', '') if isinstance(tja.metadata.title, dict) else str(tja.metadata.title)
-        jp_name = tja.metadata.title.get('ja', '') if isinstance(tja.metadata.title, dict) else ''
+        en_name = parser.metadata.title.get('en', '') if isinstance(parser.metadata.title, dict) else str(parser.metadata.title)
+        jp_name = parser.metadata.title.get('ja', '') if isinstance(parser.metadata.title, dict) else ''
 
         score_ini_path = tja_path.with_suffix('.tja.score.ini')
         if score_ini_path.exists():

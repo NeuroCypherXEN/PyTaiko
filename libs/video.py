@@ -14,6 +14,12 @@ class VideoPlayer:
     def __init__(self, path: Path):
         """Initialize a video player instance"""
         self.is_finished_list = [False, False]
+        self.is_static = False
+        if path.suffix == '.png' or path.suffix == '.jpg':
+            self.texture = ray.LoadTexture(str(path).encode('utf-8'))
+            self.is_static = True
+            return
+
         self.container = av.open(str(path))
         self.video_stream = self.container.streams.video[0]
 
@@ -144,6 +150,8 @@ class VideoPlayer:
 
     def start(self, current_ms: float) -> None:
         """Start video playback at call time"""
+        if self.is_static:
+            return
         self.start_ms = current_ms
         self._init_frame_generator()
         self._load_frame(0)
@@ -154,11 +162,15 @@ class VideoPlayer:
 
     def set_volume(self, volume: float) -> None:
         """Set video volume, takes float value from 0.0 to 1.0"""
+        if self.is_static:
+            return
         if self.audio is not None:
             audio.set_music_volume(self.audio, volume)
 
     def update(self):
         """Updates video playback, advancing frames and audio"""
+        if self.is_static:
+            return
         self._audio_manager()
 
         if self.frame_index >= len(self.frame_timestamps):
@@ -197,6 +209,11 @@ class VideoPlayer:
 
     def stop(self):
         """Stops the video, audio, and clears its buffer"""
+        if self.is_static:
+            if self.texture is not None:
+                ray.UnloadTexture(self.texture)
+                self.texture = None
+            return
         if self.container:
             self.container.close()
 

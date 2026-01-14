@@ -23,6 +23,7 @@ from libs.global_data import (
     ScoreMethod,
 )
 from libs.global_objects import AllNetIcon, Nameplate
+from libs.parsers.osz import OsuParser
 from libs.screen import Screen
 from libs.texture import tex
 from libs.parsers.tja import (
@@ -98,9 +99,9 @@ class GameScreen(Screen):
         self.load_hitsounds()
         self.song_info = SongInfo(session_data.song_title, session_data.genre_index)
         self.result_transition = ResultTransition(global_data.player_num)
-        subtitle = self.tja.metadata.subtitle.get(global_data.config['general']['language'].lower(), '')
-        self.bpm = self.tja.metadata.bpm
-        scene_preset = self.tja.metadata.scene_preset
+        subtitle = self.parser.metadata.subtitle.get(global_data.config['general']['language'].lower(), '')
+        self.bpm = self.parser.metadata.bpm
+        scene_preset = self.parser.metadata.scene_preset
         if self.movie is None:
             self.background = Background(global_data.player_num, self.bpm, scene_preset=scene_preset)
             logger.info("Background initialized")
@@ -144,18 +145,22 @@ class GameScreen(Screen):
 
     def init_tja(self, song: Path):
         """Initialize the TJA file"""
-        self.tja = TJAParser(song, start_delay=self.start_delay)
-        if self.tja.metadata.bgmovie != Path() and self.tja.metadata.bgmovie.exists():
-            self.movie = VideoPlayer(self.tja.metadata.bgmovie)
+        if song.suffix == '.osu':
+            self.start_delay = 0
+            self.parser = OsuParser(song)
+        else:
+            self.parser = TJAParser(song, start_delay=self.start_delay)
+        if self.parser.metadata.bgmovie != Path() and self.parser.metadata.bgmovie.exists():
+            self.movie = VideoPlayer(self.parser.metadata.bgmovie)
         else:
             self.movie = None
-        global_data.session_data[global_data.player_num].song_title = self.tja.metadata.title.get(global_data.config['general']['language'].lower(), self.tja.metadata.title['en'])
-        if self.tja.metadata.wave.exists() and self.tja.metadata.wave.is_file() and self.song_music is None:
-            self.song_music = audio.load_music_stream(self.tja.metadata.wave, 'song')
+        global_data.session_data[global_data.player_num].song_title = self.parser.metadata.title.get(global_data.config['general']['language'].lower(), self.parser.metadata.title['en'])
+        if self.parser.metadata.wave.exists() and self.parser.metadata.wave.is_file() and self.song_music is None:
+            self.song_music = audio.load_music_stream(self.parser.metadata.wave, 'song')
 
-        self.player_1 = Player(self.tja, global_data.player_num, global_data.session_data[global_data.player_num].selected_difficulty, False, global_data.modifiers[global_data.player_num])
-        self.start_ms = get_current_ms() - self.tja.metadata.offset*1000
-        self.precise_start = time.time() - self.tja.metadata.offset
+        self.player_1 = Player(self.parser, global_data.player_num, global_data.session_data[global_data.player_num].selected_difficulty, False, global_data.modifiers[global_data.player_num])
+        self.start_ms = get_current_ms() - self.parser.metadata.offset*1000
+        self.precise_start = time.time() - self.parser.metadata.offset
 
     def write_score(self):
         """Write the score to the database"""
@@ -183,21 +188,21 @@ class GameScreen(Screen):
                 INSERT OR REPLACE INTO Scores (hash, en_name, jp_name, diff, score, good, ok, bad, drumroll, combo, clear)
                 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 '''
-                data = (hash, self.tja.metadata.title['en'],
-                        self.tja.metadata.title.get('ja', ''), self.player_1.difficulty,
+                data = (hash, self.parser.metadata.title['en'],
+                        self.parser.metadata.title.get('ja', ''), self.player_1.difficulty,
                         session_data.result_data.score, session_data.result_data.good,
                         session_data.result_data.ok, session_data.result_data.bad,
                         session_data.result_data.total_drumroll, session_data.result_data.max_combo, crown)
                 cursor.execute(insert_query, data)
                 session_data.result_data.prev_score = existing_score if existing_score is not None else 0
-                logger.info(f"Wrote score {session_data.result_data.score} for {self.tja.metadata.title['en']}")
+                logger.info(f"Wrote score {session_data.result_data.score} for {self.parser.metadata.title['en']}")
                 con.commit()
             if result is None or (existing_crown is not None and crown > existing_crown):
                 cursor.execute("UPDATE Scores SET clear = ? WHERE hash = ?", (crown, hash))
                 con.commit()
 
     def start_song(self, ms_from_start):
-        if (ms_from_start >= self.tja.metadata.offset*1000 + self.start_delay - global_data.config["general"]["audio_offset"]) and not self.song_started:
+        if (ms_from_start >= self.parser.metadata.offset*1000 + self.start_delay - global_data.config["general"]["audio_offset"]) and not self.song_started:
             if self.song_music is not None:
                 audio.play_music_stream(self.song_music, 'music')
                 logger.info(f"Song started at {ms_from_start}")
@@ -275,7 +280,7 @@ class GameScreen(Screen):
         if self.transition.is_finished:
             self.start_song(self.current_ms)
         else:
-            self.start_ms = current_time - self.tja.metadata.offset*1000
+            self.start_ms = current_time - self.parser.metadata.offset*1000
         self.update_background(current_time)
 
         self.update_audio(self.current_ms)
@@ -330,7 +335,7 @@ class Player:
     TIMING_OK_EASY = 108.441665649414
     TIMING_BAD_EASY = 125.125
 
-    def __init__(self, tja: TJAParser, player_num: PlayerNum, difficulty: int, is_2p: bool, modifiers: Modifiers):
+    def __init__(self, parser: TJAParser | OsuParser, player_num: PlayerNum, difficulty: int, is_2p: bool, modifiers: Modifiers):
         self.is_2p = is_2p
         self.is_dan = False
         self.player_num = player_num
@@ -338,7 +343,7 @@ class Player:
         self.visual_offset = global_data.config["general"]["visual_offset"]
         self.score_method = global_data.config["general"]["score_method"]
         self.modifiers = modifiers
-        self.tja = tja
+        self.parser = parser
 
         self.reset_chart()
 
@@ -369,7 +374,10 @@ class Player:
         self.delay_start: Optional[float] = None
         self.delay_end: Optional[float] = None
         self.combo_announce = ComboAnnounce(self.combo, 0, player_num, self.is_2p)
-        self.branch_indicator = BranchIndicator(self.is_2p) if tja and tja.metadata.course_data[self.difficulty].is_branching else None
+        if not parser.metadata.course_data:
+            self.branch_indicator = None
+        else:
+            self.branch_indicator = BranchIndicator(self.is_2p) if parser and parser.metadata.course_data[self.difficulty].is_branching else None
         self.ending_anim: Optional[FailAnimation | ClearAnimation | FCAnimation] = None
         self.is_gogo_time = False
         plate_info = global_data.config[f'nameplate_{self.is_2p+1}p']
@@ -381,7 +389,10 @@ class Player:
             self.judge_counter = None
 
         self.input_log: dict[float, str] = dict()
-        stars = tja.metadata.course_data[self.difficulty].level
+        if not parser.metadata.course_data:
+            stars = 10
+        else:
+            stars = parser.metadata.course_data[self.difficulty].level
         self.gauge = Gauge(self.player_num, self.difficulty, stars, self.total_notes, self.is_2p)
         self.gauge_hit_effect: list[GaugeHitEffect] = []
 
@@ -414,9 +425,8 @@ class Player:
         unload_offset = travel_distance / sudden_pixels_per_ms
         note.unload_ms = note.hit_ms + unload_offset
 
-
     def reset_chart(self):
-        notes, self.branch_m, self.branch_e, self.branch_n = self.tja.notes_to_position(self.difficulty)
+        notes, self.branch_m, self.branch_e, self.branch_n = self.parser.notes_to_position(self.difficulty)
         self.play_notes, self.draw_note_list, self.draw_bar_list = deque(apply_modifiers(notes, self.modifiers)[0]), deque(apply_modifiers(notes, self.modifiers)[1]), deque(apply_modifiers(notes, self.modifiers)[2])
 
         self.don_notes = deque([note for note in self.play_notes if note.type in {NoteType.DON, NoteType.DON_L}])
@@ -434,12 +444,12 @@ class Player:
         if self.score_method == ScoreMethod.SHINUCHI:
             self.base_score = calculate_base_score(total_notes)
         elif self.score_method == ScoreMethod.GEN3:
-            self.score_diff = self.tja.metadata.course_data[self.difficulty].scorediff
+            self.score_diff = self.parser.metadata.course_data[self.difficulty].scorediff
             if self.score_diff <= 0:
                 logger.warning("Error: No scorediff specified or scorediff less than 0 | Using shinuchi scoring method instead")
                 self.score_diff = 0
 
-            score_init_list = self.tja.metadata.course_data[self.difficulty].scoreinit
+            score_init_list = self.parser.metadata.course_data[self.difficulty].scoreinit
             if len(score_init_list) <= 0:
                 logger.warning("Error: No scoreinit specified or scoreinit less than 0 | Using shinuchi scoring method instead")
                 self.score_init = calculate_base_score(total_notes)
