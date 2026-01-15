@@ -1,4 +1,3 @@
-import copy
 import json
 import logging
 import sys
@@ -128,7 +127,7 @@ class TextureWrapper:
         if index not in self.animations:
             raise Exception(f"Unable to find id {index} in loaded animations")
         if is_copy:
-            new_anim = copy.deepcopy(self.animations[index])
+            new_anim = self.animations[index].copy()
             if self.animations[index].loop:
                 new_anim.start()
             return new_anim

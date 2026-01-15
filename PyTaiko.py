@@ -297,7 +297,7 @@ def draw_fps(last_fps: int):
     elif last_fps < 60:
         pyray.draw_text_ex(global_data.font, f'{last_fps} FPS', (pos, pos), pos, 1, pyray.YELLOW)
     else:
-        pyray.draw_text_ex(global_data.font, f'{last_fps} FPS', (pos, pos), pos, 1, pyray.LIME)
+        pyray.draw_text_ex(pyray.get_font_default(), f'{last_fps} FPS', (pos, pos), pos, 1, pyray.LIME)
 
 def draw_outer_border(screen_width: int, screen_height: int, last_color: pyray.Color):
     pyray.draw_rectangle(-screen_width, 0, screen_width, screen_height, last_color)

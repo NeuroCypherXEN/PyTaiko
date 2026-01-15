@@ -175,6 +175,7 @@ void pause_music_stream(music music);
 void resume_music_stream(music music);
 void stop_music_stream(music music);
 void seek_music_stream(music music, float position);
+bool music_stream_needs_update(music music);
 void update_music_stream(music music);
 bool is_music_stream_playing(music music);
 void set_music_volume(music music, float volume);
@@ -1064,6 +1065,17 @@ void seek_music_stream(music music, float position) {
     pthread_mutex_unlock(&AUDIO.System.lock);
 }
 
+bool music_stream_needs_update(music music) {
+    if (music.stream.buffer == NULL || music.ctxData == NULL) return false;
+
+    pthread_mutex_lock(&AUDIO.System.lock);
+    bool needs_update = music.stream.buffer->isSubBufferProcessed[0] ||
+                        music.stream.buffer->isSubBufferProcessed[1];
+    pthread_mutex_unlock(&AUDIO.System.lock);
+
+    return needs_update;
+}
+
 void update_music_stream(music music) {
     if (music.stream.buffer == NULL || music.ctxData == NULL) return;
 
@@ -1071,72 +1083,80 @@ void update_music_stream(music music) {
     SNDFILE *sndFile = ctx->snd_file;
     if (sndFile == NULL) return;
 
+    bool needs_refill[2];
+    pthread_mutex_lock(&AUDIO.System.lock);
+    needs_refill[0] = music.stream.buffer->isSubBufferProcessed[0];
+    needs_refill[1] = music.stream.buffer->isSubBufferProcessed[1];
+    pthread_mutex_unlock(&AUDIO.System.lock);
+
+    if (!needs_refill[0] && !needs_refill[1]) return;
+
+    unsigned int subBufferSizeFrames = music.stream.buffer->sizeInFrames / 2;
+    float *buffer_data = (float *)music.stream.buffer->data;
+    bool needs_resampling = (ctx->resampler != NULL);
+    bool needs_mono_to_stereo = (music.stream.channels == 1 && AUDIO_DEVICE_CHANNELS == 2);
+
+    unsigned int frames_to_read = subBufferSizeFrames;
+    if (needs_resampling) {
+        frames_to_read = (unsigned int)(subBufferSizeFrames / ctx->src_ratio) + 1;
+    }
+
+    size_t required_size = frames_to_read * music.stream.channels * sizeof(float);
+    if (AUDIO.System.pcmBufferSize < required_size) {
+        FREE(AUDIO.System.pcmBuffer);
+        AUDIO.System.pcmBuffer = calloc(1, required_size);
+        AUDIO.System.pcmBufferSize = required_size;
+    }
+
     for (int i = 0; i < 2; i++) {
-        pthread_mutex_lock(&AUDIO.System.lock);
-        bool needs_refill = music.stream.buffer->isSubBufferProcessed[i];
-        pthread_mutex_unlock(&AUDIO.System.lock);
+        if (!needs_refill[i]) continue;
 
-        if (needs_refill) {
-            unsigned int subBufferSizeFrames = music.stream.buffer->sizeInFrames / 2;
+        sf_count_t frames_read = sf_readf_float(sndFile, (float*)AUDIO.System.pcmBuffer, frames_to_read);
 
-            unsigned int frames_to_read = subBufferSizeFrames;
-            if (ctx->resampler) {
-                frames_to_read = (unsigned int)(subBufferSizeFrames / ctx->src_ratio) + 1;
+        unsigned int subBufferOffset = i * subBufferSizeFrames * AUDIO_DEVICE_CHANNELS;
+        float *input_ptr = (float *)AUDIO.System.pcmBuffer;
+        sf_count_t frames_written = 0;
+
+        if (needs_resampling) {
+            spx_uint32_t in_len = frames_read;
+            spx_uint32_t out_len = subBufferSizeFrames;
+
+            int error = speex_resampler_process_interleaved_float(
+                ctx->resampler,
+                input_ptr,
+                &in_len,
+                buffer_data + subBufferOffset,
+                &out_len
+            );
+
+            if (error != RESAMPLER_ERR_SUCCESS) {
+                TRACELOG(LOG_WARNING, "Resampling failed with error: %d", error);
             }
 
-            if (AUDIO.System.pcmBufferSize < frames_to_read * music.stream.channels * sizeof(float)) {
-                FREE(AUDIO.System.pcmBuffer);
-                AUDIO.System.pcmBuffer = calloc(1, frames_to_read * music.stream.channels * sizeof(float));
-                AUDIO.System.pcmBufferSize = frames_to_read * music.stream.channels * sizeof(float);
-            }
-
-            sf_count_t frames_read = sf_readf_float(sndFile, (float*)AUDIO.System.pcmBuffer, frames_to_read);
-
-            unsigned int subBufferOffset = i * subBufferSizeFrames * AUDIO_DEVICE_CHANNELS;
-            float *buffer_data = (float *)music.stream.buffer->data;
-            float *input_ptr = (float *)AUDIO.System.pcmBuffer;
-            sf_count_t frames_written = 0;
-
-            if (ctx->resampler) {
-                spx_uint32_t in_len = frames_read;
-                spx_uint32_t out_len = subBufferSizeFrames;
-
-                int error = speex_resampler_process_interleaved_float(
-                    ctx->resampler,
-                    input_ptr,
-                    &in_len,
-                    buffer_data + subBufferOffset,
-                    &out_len
-                );
-
-                if (error != RESAMPLER_ERR_SUCCESS) {
-                    TRACELOG(LOG_WARNING, "Resampling failed with error: %d", error);
+            frames_written = out_len;
+        } else {
+            if (needs_mono_to_stereo) {
+                for (int j = 0; j < frames_read; j++) {
+                    buffer_data[subBufferOffset + j*2] = input_ptr[j];
+                    buffer_data[subBufferOffset + j*2 + 1] = input_ptr[j];
                 }
-
-                frames_written = out_len;
             } else {
-                if (music.stream.channels == 1 && AUDIO_DEVICE_CHANNELS == 2) {
-                    for (int j = 0; j < frames_read; j++) {
-                        buffer_data[subBufferOffset + j*2] = input_ptr[j];
-                        buffer_data[subBufferOffset + j*2 + 1] = input_ptr[j];
-                    }
-                } else {
-                    memcpy(buffer_data + subBufferOffset, input_ptr, frames_read * music.stream.channels * sizeof(float));
-                }
-                frames_written = frames_read;
+                memcpy(buffer_data + subBufferOffset, input_ptr, frames_read * music.stream.channels * sizeof(float));
             }
+            frames_written = frames_read;
+        }
 
-            if (frames_written < subBufferSizeFrames) {
-                unsigned int offset = subBufferOffset + (frames_written * AUDIO_DEVICE_CHANNELS);
-                unsigned int size = (subBufferSizeFrames - frames_written) * AUDIO_DEVICE_CHANNELS * sizeof(float);
-                memset(buffer_data + offset, 0, size);
-            }
-
-            pthread_mutex_lock(&AUDIO.System.lock);
-            music.stream.buffer->isSubBufferProcessed[i] = false;
-            pthread_mutex_unlock(&AUDIO.System.lock);
+        if (frames_written < subBufferSizeFrames) {
+            unsigned int offset = subBufferOffset + (frames_written * AUDIO_DEVICE_CHANNELS);
+            unsigned int size = (subBufferSizeFrames - frames_written) * AUDIO_DEVICE_CHANNELS * sizeof(float);
+            memset(buffer_data + offset, 0, size);
         }
     }
+
+    pthread_mutex_lock(&AUDIO.System.lock);
+    if (needs_refill[0]) music.stream.buffer->isSubBufferProcessed[0] = false;
+    if (needs_refill[1]) music.stream.buffer->isSubBufferProcessed[1] = false;
+    pthread_mutex_unlock(&AUDIO.System.lock);
 }
 
 bool is_music_stream_playing(music music) {

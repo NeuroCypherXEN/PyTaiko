@@ -64,7 +64,7 @@ device_type = 0
 sample_rate = 44100
 # buffer_size: Size in samples per audio buffer
 # - 0 = let driver choose (may result in very small buffers with ASIO, typically 64)
-buffer_size = 32
+buffer_size = 128
 
 [volume]
 sound = 1.0

@@ -32,6 +32,7 @@ from scenes.game import (
     DrumType,
     GameScreen,
     JudgeCounter,
+    Judgments,
     LaneHitEffect,
     Player,
     Side,
@@ -311,7 +312,7 @@ class PracticePlayer(Player):
                 self.check_note(ms_from_start, drum_type, current_time, background)
 
     def spawn_hit_effects(self, drum_type: DrumType, side: Side):
-        self.lane_hit_effect = LaneHitEffect(drum_type, self.is_2p)
+        self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.BAD, self.is_2p)
         self.draw_drum_hit_list.append(PracticeDrumHitEffect(drum_type, side, self.is_2p, player_num=self.player_num))
 
     def draw_overlays(self, mask_shader: ray.Shader):

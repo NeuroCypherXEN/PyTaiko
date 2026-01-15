@@ -84,6 +84,22 @@ class BaseAnimation():
         self.restart()
         self.pause()
 
+    def copy(self):
+        """Create a copy of the animation with reset state."""
+        new_anim = self.__class__.__new__(self.__class__)
+        new_anim.duration = self.duration
+        new_anim.delay = self.delay_saved
+        new_anim.delay_saved = self.delay_saved
+        new_anim.start_ms = get_current_ms()
+        new_anim.is_finished = False
+        new_anim.attribute = 0
+        new_anim.is_started = False
+        new_anim.is_reversing = False
+        new_anim.unlocked = False
+        new_anim.loop = self.loop
+        new_anim.lock_input = self.lock_input
+        return new_anim
+
     def _ease_in(self, progress: float, ease_type: str) -> float:
         if ease_type == "quadratic":
             return progress * progress
@@ -133,6 +149,20 @@ class FadeAnimation(BaseAnimation):
         self.final_opacity = self.final_opacity_saved
         self.attribute = self.initial_opacity
 
+    def copy(self):
+        """Create a copy of the fade animation with reset state."""
+        new_anim = super().copy()
+        new_anim.initial_opacity = self.initial_opacity_saved
+        new_anim.initial_opacity_saved = self.initial_opacity_saved
+        new_anim.final_opacity = self.final_opacity_saved
+        new_anim.final_opacity_saved = self.final_opacity_saved
+        new_anim.ease_in = self.ease_in
+        new_anim.ease_out = self.ease_out
+        new_anim.reverse_delay = self.reverse_delay_saved
+        new_anim.reverse_delay_saved = self.reverse_delay_saved
+        new_anim.attribute = self.initial_opacity_saved
+        return new_anim
+
     def update(self, current_time_ms: float) -> None:
         if not self.is_started:
             return
@@ -181,6 +211,20 @@ class MoveAnimation(BaseAnimation):
         self.start_position = self.start_position_saved
         self.attribute = self.start_position
 
+    def copy(self):
+        """Create a copy of the move animation with reset state."""
+        new_anim = super().copy()
+        new_anim.reverse_delay = self.reverse_delay_saved
+        new_anim.reverse_delay_saved = self.reverse_delay_saved
+        new_anim.total_distance = self.total_distance_saved
+        new_anim.total_distance_saved = self.total_distance_saved
+        new_anim.start_position = self.start_position_saved
+        new_anim.start_position_saved = self.start_position_saved
+        new_anim.ease_in = self.ease_in
+        new_anim.ease_out = self.ease_out
+        new_anim.attribute = self.start_position_saved
+        return new_anim
+
     def update(self, current_time_ms: float) -> None:
         if not self.is_started:
             return
@@ -217,6 +261,13 @@ class TextureChangeAnimation(BaseAnimation):
         super().reset()
         self.attribute = self.textures[0][2]
 
+    def copy(self):
+        """Create a copy of the texture change animation with reset state."""
+        new_anim = super().copy()
+        new_anim.textures = self.textures  # List of tuples, can be shared
+        new_anim.attribute = self.textures[0][2]
+        return new_anim
+
     def update(self, current_time_ms: float) -> None:
         if not self.is_started:
             return
@@ -234,6 +285,10 @@ class TextureChangeAnimation(BaseAnimation):
             self.is_finished = True
 
 class TextStretchAnimation(BaseAnimation):
+    def copy(self):
+        """Create a copy of the text stretch animation with reset state."""
+        return super().copy()
+
     def update(self, current_time_ms: float) -> None:
         if not self.is_started:
             return
@@ -274,6 +329,20 @@ class TextureResizeAnimation(BaseAnimation):
         self.reverse_delay = self.reverse_delay_saved
         self.initial_size = self.initial_size_saved
         self.final_size = self.final_size_saved
+
+    def copy(self):
+        """Create a copy of the texture resize animation with reset state."""
+        new_anim = super().copy()
+        new_anim.initial_size = self.initial_size_saved
+        new_anim.initial_size_saved = self.initial_size_saved
+        new_anim.final_size = self.final_size_saved
+        new_anim.final_size_saved = self.final_size_saved
+        new_anim.reverse_delay = self.reverse_delay_saved
+        new_anim.reverse_delay_saved = self.reverse_delay_saved
+        new_anim.ease_in = self.ease_in
+        new_anim.ease_out = self.ease_out
+        new_anim.attribute = self.initial_size_saved
+        return new_anim
 
 
     def update(self, current_time_ms: float) -> None:

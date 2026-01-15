@@ -175,6 +175,12 @@ class OutlinedText:
 
         self.default_src = ray.Rectangle(0, 0, self.texture.width, self.texture.height)
 
+        self._last_outline_color = None
+        self._last_color = None
+        self._last_fade = None
+        self._outline_color_alloc = None
+        self._alpha_value = None
+
     def _hash_text(self, text: str, font_size: int, color: ray.Color, vertical: bool):
         n = hashlib.sha256()
         n.update(text.encode('utf-8'))
@@ -406,30 +412,37 @@ class OutlinedText:
             rotation (float): The rotation angle of the text.
             fade (float): The fade factor to apply to the text.
         """
-        if isinstance(outline_color, tuple):
-            outline_color_alloc = ray.ffi.new("float[4]", [
-                outline_color[0] / 255.0,
-                outline_color[1] / 255.0,
-                outline_color[2] / 255.0,
-                outline_color[3] / 255.0
-            ])
-        else:
-            outline_color_alloc = ray.ffi.new("float[4]", [
-                outline_color.r / 255.0,
-                outline_color.g / 255.0,
-                outline_color.b / 255.0,
-                outline_color.a / 255.0
-            ])
-        ray.set_shader_value(self.shader, self.outline_color_loc, outline_color_alloc, SHADER_UNIFORM_VEC4)
-        if isinstance(color, tuple):
-            alpha_value = ray.ffi.new('float*', min(fade * 255, color[3]) / 255.0)
-        else:
-            alpha_value = ray.ffi.new('float*', min(fade * 255, color.a) / 255.0)
+        if self._last_outline_color != outline_color:
+            if isinstance(outline_color, tuple):
+                self._outline_color_alloc = ray.ffi.new("float[4]", [
+                    outline_color[0] / 255.0,
+                    outline_color[1] / 255.0,
+                    outline_color[2] / 255.0,
+                    outline_color[3] / 255.0
+                ])
+            else:
+                self._outline_color_alloc = ray.ffi.new("float[4]", [
+                    outline_color.r / 255.0,
+                    outline_color.g / 255.0,
+                    outline_color.b / 255.0,
+                    outline_color.a / 255.0
+                ])
+            ray.set_shader_value(self.shader, self.outline_color_loc, self._outline_color_alloc, SHADER_UNIFORM_VEC4)
+            self._last_outline_color = outline_color
+
+        if self._last_color != color or self._last_fade != fade:
+            if isinstance(color, tuple):
+                self._alpha_value = ray.ffi.new('float*', min(fade * 255, color[3]) / 255.0)
+            else:
+                self._alpha_value = ray.ffi.new('float*', min(fade * 255, color.a) / 255.0)
+            ray.set_shader_value(self.shader, self.alpha_loc, self._alpha_value, SHADER_UNIFORM_FLOAT)
+            self._last_color = color
+            self._last_fade = fade
+
         if fade != 1.1:
             final_color = ray.fade(color, fade)
         else:
             final_color = color
-        ray.set_shader_value(self.shader, self.alpha_loc, alpha_value, SHADER_UNIFORM_FLOAT)
         if not self.vertical:
             offset = (10 * global_tex.screen_scale)-10
         else:

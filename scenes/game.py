@@ -321,10 +321,10 @@ class GameScreen(Screen):
     def draw(self):
         if self.movie is not None:
             self.movie.draw()
-        elif self.background is not None:
-            self.background.draw()
+            #elif self.background is not None:
+            #self.background.draw()
         self.player_1.draw(self.current_ms, self.start_ms, self.mask_shader)
-        self.draw_overlay()
+        #self.draw_overlay()
 
 class Player:
     TIMING_GOOD = 25.0250015258789
@@ -861,7 +861,8 @@ class Player:
         if background is not None:
             background.add_renda()
         self.score += 100
-        self.base_score_list.append(ScoreCounterAnimation(self.player_num, 100, self.is_2p))
+        if len(self.base_score_list) < 5:
+            self.base_score_list.append(ScoreCounterAnimation(self.player_num, 100, self.is_2p))
         if not self.current_notes_draw:
             return
         if not isinstance(self.current_notes_draw[0], Drumroll):
@@ -880,7 +881,8 @@ class Player:
         self.curr_balloon_count += 1
         self.total_drumroll += 1
         self.score += 100
-        self.base_score_list.append(ScoreCounterAnimation(self.player_num, 100, self.is_2p))
+        if len(self.base_score_list) < 5:
+            self.base_score_list.append(ScoreCounterAnimation(self.player_num, 100, self.is_2p))
         if self.curr_balloon_count == note.count:
             self.is_balloon = False
             note.popped = True
@@ -954,11 +956,13 @@ class Player:
 
             big = curr_note.type == NoteType.DON_L or curr_note.type == NoteType.KAT_L
             if (curr_note.hit_ms - good_window_ms) <= ms_from_start <= (curr_note.hit_ms + good_window_ms):
-                self.draw_judge_list.append(Judgment(Judgments.GOOD, big, self.is_2p))
+                if len(self.draw_judge_list) < 7:
+                    self.draw_judge_list.append(Judgment(Judgments.GOOD, big, self.is_2p))
                 self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.GOOD, self.is_2p)
                 self.good_count += 1
                 self.score += self.base_score
-                self.base_score_list.append(ScoreCounterAnimation(self.player_num, self.base_score, self.is_2p))
+                if len(self.base_score_list) < 5:
+                    self.base_score_list.append(ScoreCounterAnimation(self.player_num, self.base_score, self.is_2p))
                 self.input_log[curr_note.index] = 'GOOD'
                 self.note_correct(curr_note, current_time)
                 if self.gauge is not None:
@@ -976,7 +980,8 @@ class Player:
                 self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.OK, self.is_2p)
                 self.ok_count += 1
                 self.score += 10 * math.floor(self.base_score / 2 / 10)
-                self.base_score_list.append(ScoreCounterAnimation(self.player_num, 10 * math.floor(self.base_score / 2 / 10), self.is_2p))
+                if len(self.base_score_list) < 5:
+                    self.base_score_list.append(ScoreCounterAnimation(self.player_num, 10 * math.floor(self.base_score / 2 / 10), self.is_2p))
                 self.input_log[curr_note.index] = 'OK'
                 self.note_correct(curr_note, current_time)
                 if self.gauge is not None:
@@ -1038,7 +1043,8 @@ class Player:
 
     def spawn_hit_effects(self, drum_type: DrumType, side: Side):
         self.lane_hit_effect = LaneHitEffect(drum_type, Judgments.BAD, self.is_2p)  # Bad code detected...
-        self.draw_drum_hit_list.append(DrumHitEffect(drum_type, side, self.is_2p))
+        if len(self.draw_drum_hit_list) < 4:
+            self.draw_drum_hit_list.append(DrumHitEffect(drum_type, side, self.is_2p))
 
     def handle_input(self, ms_from_start: float, current_time: float, background: Optional[Background]):
         input_checks = [
@@ -1153,7 +1159,7 @@ class Player:
         finished_arcs = []
         for i, anim in enumerate(self.draw_arc_list):
             anim.update(current_time)
-            if anim.is_finished:
+            if anim.is_finished and len(self.gauge_hit_effect) < 7:
                 self.gauge_hit_effect.append(GaugeHitEffect(anim.note_type, anim.is_big, self.is_2p))
                 finished_arcs.append(i)
         for i in reversed(finished_arcs):
@@ -1409,7 +1415,7 @@ class Player:
         if dan_transition is not None:
             dan_transition.draw()
 
-        self.draw_overlays(mask_shader)
+        #self.draw_overlays(mask_shader)
 
 class Judgment:
     """Shows the judgment of the player's hit"""

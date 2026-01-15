@@ -92,6 +92,7 @@ ffi.cdef("""
     void resume_music_stream(music music);
     void stop_music_stream(music music);
     void seek_music_stream(music music, float position);
+    bool music_stream_needs_update(music music);
     void update_music_stream(music music);
     bool is_music_stream_playing(music music);
     void set_music_volume(music music, float volume);
@@ -359,11 +360,19 @@ class AudioEngine:
         else:
             logger.warning(f"Music stream {name} not found")
 
-    def update_music_stream(self, name: str) -> None:
-        """Update a music stream"""
+    def music_stream_needs_update(self, name: str) -> bool:
+        """Check if a music stream needs updating (buffers need refilling)"""
         if name in self.music_streams:
             music = self.music_streams[name]
-            lib.update_music_stream(music) # type: ignore
+            return lib.music_stream_needs_update(music) # type: ignore
+        return False
+
+    def update_music_stream(self, name: str) -> None:
+        """Update a music stream (only if buffers need refilling)"""
+        if name in self.music_streams:
+            music = self.music_streams[name]
+            if lib.music_stream_needs_update(music): # type: ignore
+                lib.update_music_stream(music) # type: ignore
         else:
             logger.warning(f"Music stream {name} not found")
 
