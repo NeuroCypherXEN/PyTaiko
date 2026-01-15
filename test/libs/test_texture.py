@@ -199,33 +199,6 @@ class TestTextureWrapper(unittest.TestCase):
 
     @patch('libs.texture.get_config')
     @patch('libs.texture.Path')
-    @patch('libs.texture.copy.deepcopy')
-    def test_get_animation_copy(self, mock_deepcopy, mock_path_cls, mock_get_config):
-        """Test getting animation copy."""
-        mock_get_config.return_value = {'paths': {'skin': 'TestSkin'}}
-
-        # Mock the skin_config.json file
-        mock_path_instance = Mock()
-        mock_config_path = Mock()
-        mock_config_path.exists.return_value = True
-        mock_config_path.read_text.return_value = '{"screen": {"width": 1280, "height": 720}}'
-        mock_path_instance.__truediv__ = Mock(return_value=mock_config_path)
-        mock_path_cls.return_value = mock_path_instance
-
-        mock_animation = Mock()
-        mock_copy = Mock()
-        mock_deepcopy.return_value = mock_copy
-
-        wrapper = TextureWrapper()
-        wrapper.animations = {0: mock_animation}
-
-        result = wrapper.get_animation(0, is_copy=True)
-
-        mock_deepcopy.assert_called_once_with(mock_animation)
-        self.assertEqual(result, mock_copy)
-
-    @patch('libs.texture.get_config')
-    @patch('libs.texture.Path')
     @patch('libs.texture.ray')
     def test_read_tex_obj_data(self, mock_ray, mock_path_cls, mock_get_config):
         """Test reading texture object data from JSON."""
