@@ -321,10 +321,10 @@ class GameScreen(Screen):
     def draw(self):
         if self.movie is not None:
             self.movie.draw()
-            #elif self.background is not None:
-            #self.background.draw()
+        elif self.background is not None:
+            self.background.draw()
         self.player_1.draw(self.current_ms, self.start_ms, self.mask_shader)
-        #self.draw_overlay()
+        self.draw_overlay()
 
 class Player:
     TIMING_GOOD = 25.0250015258789
@@ -1415,7 +1415,7 @@ class Player:
         if dan_transition is not None:
             dan_transition.draw()
 
-        #self.draw_overlays(mask_shader)
+        self.draw_overlays(mask_shader)
 
 class Judgment:
     """Shows the judgment of the player's hit"""
