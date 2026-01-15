@@ -3,17 +3,8 @@ from typing import Any, Optional
 
 from libs.global_data import global_data
 
-
-def rounded(num: float) -> int:
-    sign = 1 if (num >= 0) else -1
-    num = abs(num)
-    result = int(num)
-    if (num - result >= 0.5):
-        result += 1
-    return sign * result
-
-def get_current_ms() -> int:
-    return rounded(time.time() * 1000)
+def get_current_ms() -> float:
+    return time.time() * 1000
 
 
 class BaseAnimation():

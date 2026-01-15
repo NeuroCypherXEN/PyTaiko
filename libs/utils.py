@@ -40,9 +40,9 @@ def rounded(num: float) -> int:
         result += 1
     return sign * result
 
-def get_current_ms() -> int:
+def get_current_ms() -> float:
     """Get the current time in milliseconds"""
-    return rounded(time.time() * 1000)
+    return time.time() * 1000
 
 def strip_comments(code: str) -> str:
     """Strip comments from a string of code"""

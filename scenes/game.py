@@ -1627,6 +1627,8 @@ class GaugeHitEffect:
 
 class NoteArc:
     """Note arcing from the player to the gauge"""
+    _arc_points_cache = {}
+
     def __init__(self, note_type: int, current_ms: float, player_num: PlayerNum, big: bool, is_balloon: bool, start_x: float = 0, start_y: float = 0):
         self.note_type = note_type
         self.is_big = big
@@ -1660,13 +1662,20 @@ class NoteArc:
         self.x_i = self.start_x
         self.y_i = self.start_y
         self.is_finished = False
-        self.arc_points_cache = []
-        for i in range(self.arc_points + 1):
-            t = i / self.arc_points
-            t_inv = 1.0 - t
-            x = int(t_inv * t_inv * self.start_x + 2 * t_inv * t * self.control_x + t * t * self.end_x)
-            y = int(t_inv * t_inv * self.start_y + 2 * t_inv * t * self.control_y + t * t * self.end_y)
-            self.arc_points_cache.append((x, y))
+
+        cache_key = (self.start_x, self.start_y, self.end_x, self.end_y, self.control_x, self.control_y, self.arc_points)
+
+        if cache_key not in NoteArc._arc_points_cache:
+            arc_points_list = []
+            for i in range(self.arc_points + 1):
+                t = i / self.arc_points
+                t_inv = 1.0 - t
+                x = int(t_inv * t_inv * self.start_x + 2 * t_inv * t * self.control_x + t * t * self.end_x)
+                y = int(t_inv * t_inv * self.start_y + 2 * t_inv * t * self.control_y + t * t * self.end_y)
+                arc_points_list.append((x, y))
+            NoteArc._arc_points_cache[cache_key] = arc_points_list
+
+        self.arc_points_cache = NoteArc._arc_points_cache[cache_key]
 
         self.explosion_x, self.explosion_y = self.arc_points_cache[0]
         self.explosion_anim = tex.get_animation(22)
