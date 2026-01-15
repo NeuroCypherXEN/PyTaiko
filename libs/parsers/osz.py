@@ -43,7 +43,7 @@ class OsuParser:
             self.bpm.append(math.floor(1 / points[1] * 1000 * 60))
         self.osu_NoteList = self.note_data_to_NoteList(self.hit_objects)
         for points in self.timing_points:
-            if points[1] > 0:
+            if 0 < points[1] < 60000:
                 obj = TimelineObject()
                 obj.hit_ms = points[0]
                 obj.bpm = math.floor(1 / points[1] * 1000 * 60)
