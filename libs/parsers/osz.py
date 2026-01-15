@@ -33,7 +33,7 @@ class OsuParser:
         self.metadata.offset = -30/1000
         self.metadata.title["en"] = self.osu_metadata["Version"]
         self.metadata.subtitle["en"] = self.osu_metadata["Creator"]
-        match = re.search(r'\[Events\][\s\S]*?^[ \t]*(\d+),(\d+),"([^"]+)"', osu_file.read_text(), re.MULTILINE)
+        match = re.search(r'\[Events\][\s\S]*?^[ \t]*(\d+),(\d+),"([^"]+)"', osu_file.read_text(encoding='utf-8'), re.MULTILINE)
         if match:
             self.metadata.bgmovie = osu_file.parent / Path(match.group(3))
         self.metadata.course_data[0] = CourseData()
