@@ -198,10 +198,26 @@ class VideoPlayer:
     def draw(self):
         """Draw video frames to the raylib canvas"""
         if self.texture is not None:
+            source = (0, 0, self.texture.width, self.texture.height)
+            texture_aspect = self.texture.width / self.texture.height
+            screen_aspect = tex.screen_width / tex.screen_height
+            if texture_aspect > screen_aspect:
+                dest_width = tex.screen_width
+                dest_height = tex.screen_width / texture_aspect
+                dest_x = 0
+                dest_y = (tex.screen_height - dest_height) / 2
+            else:
+                dest_height = tex.screen_height
+                dest_width = tex.screen_height * texture_aspect
+                dest_x = (tex.screen_width - dest_width) / 2
+                dest_y = 0
+
+            destination = (dest_x, dest_y, dest_width, dest_height)
+            ray.ClearBackground(ray.BLACK)
             ray.DrawTexturePro(
                 self.texture,
-                (0, 0, self.texture.width, self.texture.height),
-                (0, 0, tex.screen_width, tex.screen_height),
+                source,
+                destination,
                 (0, 0),
                 0,
                 ray.WHITE

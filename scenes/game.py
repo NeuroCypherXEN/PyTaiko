@@ -314,8 +314,10 @@ class GameScreen(Screen):
 
     def draw_overlay(self):
         self.song_info.draw()
-        self.transition.draw()
-        self.result_transition.draw()
+        if not self.transition.is_finished:
+            self.transition.draw()
+        if self.result_transition.is_started:
+            self.result_transition.draw()
         self.allnet_indicator.draw()
 
     def draw(self):
@@ -534,8 +536,8 @@ class Player:
         self.draw_note_list.extend(branch_section.draw_notes)
         self.draw_bar_list.extend(branch_section.bars)
         self.play_notes = deque(sorted(self.play_notes))
-        self.draw_note_list = deque(sorted(self.draw_note_list, key=lambda x: x.hit_ms))
-        self.draw_bar_list = deque(sorted(self.draw_bar_list, key=lambda x: x.hit_ms))
+        self.draw_note_list = deque(sorted(self.draw_note_list, key=lambda x: x.load_ms))
+        self.draw_bar_list = deque(sorted(self.draw_bar_list, key=lambda x: x.load_ms))
         total_don = [note for note in self.play_notes if note.type in {NoteType.DON, NoteType.DON_L}]
         total_kat = [note for note in self.play_notes if note.type in {NoteType.KAT, NoteType.KAT_L}]
         total_other = [note for note in self.play_notes if note.type not in {NoteType.DON, NoteType.DON_L, NoteType.KAT, NoteType.KAT_L}]

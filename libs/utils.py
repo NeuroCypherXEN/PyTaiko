@@ -448,10 +448,10 @@ class OutlinedText:
         else:
             offset = 0
         dest_rect = ray.Rectangle(x, y+offset, self.texture.width+x2, self.texture.height+y2)
-        if self.outline_thickness > 0:
+        if self.outline_thickness > 0 and self._last_color != ray.BLANK:
             ray.begin_shader_mode(self.shader)
         ray.draw_texture_pro(self.texture, self.default_src, dest_rect, origin, rotation, final_color)
-        if self.outline_thickness > 0:
+        if self.outline_thickness > 0 and self._last_color != ray.BLANK:
             ray.end_shader_mode()
 
     def unload(self):

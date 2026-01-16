@@ -17,7 +17,7 @@ void main()
 
     float outline = 0.0;
     int ringSamples = 16;
-    int rings = 2;
+    int rings = 1;
     for(int ring = 1; ring <= rings; ring++) {
         float ringRadius = float(ring) / float(rings);
         for(int i = 0; i < ringSamples; i++) {
