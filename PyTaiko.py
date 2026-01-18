@@ -446,6 +446,8 @@ def main():
     audio.close_audio_device()
     if discord_connected:
         RPC.close()
+    global_tex.unload_textures()
+    screen_mapping[current_screen].on_screen_end("LOADING")
     logger.info("Window closed and audio device shut down")
 
 if __name__ == "__main__":
