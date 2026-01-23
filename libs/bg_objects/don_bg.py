@@ -1,3 +1,4 @@
+from libs.animation import Animation
 from libs.global_data import PlayerNum
 from libs.texture import TextureWrapper
 
@@ -14,7 +15,8 @@ class DonBGBase:
     def __init__(self, tex: TextureWrapper, index: int, player_num: PlayerNum, path: str):
         self.name = f'{index}_{player_num}'
         tex.load_zip(path, f'donbg/{self.name}')
-        self.move = tex.get_animation(0)
+        self.move = Animation.create_move(3000, total_distance=-tex.textures[self.name]['background'].width, loop=True)
+        self.move.start()
         self.is_clear = False
         self.clear_fade = tex.get_animation(1)
 
@@ -97,7 +99,7 @@ class DonBG4(DonBGBase):
         self.overlay_move.update(current_time_ms)
 
     def _draw_textures(self, tex: TextureWrapper, fade: float, y: float):
-        for i in range(int(5 * tex.screen_scale)):
+        for i in range(5):
             tex.draw_texture(self.name, 'background', frame=self.is_clear, fade=fade, x=(i*tex.textures[self.name]['background'].width)+self.move.attribute, y=y)
             tex.draw_texture(self.name, 'overlay', frame=self.is_clear, fade=fade, x=(i*tex.textures[self.name]['overlay'].width)+self.move.attribute, y=self.overlay_move.attribute+y)
 
