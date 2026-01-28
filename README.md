@@ -56,6 +56,8 @@ brew install python@3.12 uv git speexdsp libsndfile
 
 # Downloading Pytaiko project
 git clone https://github.com/Yonokid/PyTaiko
+git submodule init
+git submodule update
 cd PyTaiko
 
 # Compiling audio libraries
