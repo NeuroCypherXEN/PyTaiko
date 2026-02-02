@@ -47,6 +47,7 @@ from scenes.two_player.result import TwoPlayerResultScreen
 from scenes.two_player.song_select import TwoPlayerSongSelectScreen
 
 logger = logging.getLogger(__name__)
+'''
 DISCORD_APP_ID = '1451423960401973353'
 try:
     RPC = Presence(DISCORD_APP_ID)
@@ -55,6 +56,7 @@ try:
 except Exception as e:
     discord_connected = False
     logger.warning(f"Could not connect to Discord: {e}")
+'''
 
 class Screens:
     TITLE = "TITLE"
@@ -279,13 +281,14 @@ def check_discord_heartbeat(current_screen):
         details = f"Playing Song: {global_data.session_data[global_data.player_num].song_title}"
     else:
         details = "Idling"
+    '''
     RPC.update(
         state=f"In Screen {current_screen}",
         details=details,
         large_text="PyTaiko",
         start=get_current_ms()/1000,
         buttons=[{"label": "Play Now", "url": "https://github.com/Yonokid/PyTaiko"}]
-    )
+    )'''
 
 def draw_fps(last_fps: int):
     curr_fps = ray.GetFPS()
@@ -400,9 +403,9 @@ def main():
 
     while not ray.WindowShouldClose():
         current_time = get_current_ms()
-        if discord_connected and current_time > last_discord_check + 1000:
-            check_discord_heartbeat(current_screen)
-            last_discord_check = current_time
+        #if discord_connected and current_time > last_discord_check + 1000:
+            #check_discord_heartbeat(current_screen)
+            #last_discord_check = current_time
 
         if ray.IsKeyPressed(global_data.config["keys"]["fullscreen_key"]):
             ray.ToggleFullscreen()
@@ -444,8 +447,8 @@ def main():
 
     ray.CloseWindow()
     audio.close_audio_device()
-    if discord_connected:
-        RPC.close()
+    #if discord_connected:
+        #RPC.close()
     global_tex.unload_textures()
     screen_mapping[current_screen].on_screen_end("LOADING")
     logger.info("Window closed and audio device shut down")
