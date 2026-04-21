@@ -15,6 +15,7 @@ from libs.texture import TextureWrapper
 
 logger = logging.getLogger(__name__)
 
+
 class Background:
     """The background class for the game."""
     COLLABS = {
@@ -31,6 +32,51 @@ class Background:
         "PRACTICE": (libs.bg_collabs.practice.Background, 'background/collab/practice', 1)
     }
 
+    def _set_shared_none_components(self) -> None:
+        self.bg_normal = None
+        self.bg_fever = None
+        self.footer = None
+        self.fever = None
+        self.dancer = None
+
+    def _init_two_player_default(self, bpm: float) -> None:
+        self.max_dancers = 5
+        don_bg_num = random.randint(0, 5)
+        self.don_bg = DonBG.create(self.tex_wrapper, don_bg_num, PlayerNum.P1)
+        self.don_bg_2 = DonBG.create(self.tex_wrapper, don_bg_num, PlayerNum.P2)
+        self.renda = RendaController(self.tex_wrapper, random.randint(0, 2))
+        self.chibi = ChibiController(self.tex_wrapper, random.randint(0, 13), bpm)
+        self._set_shared_none_components()
+
+    def _init_single_default(self, player_num: PlayerNum, bpm: float) -> None:
+        self.max_dancers = 5
+        self.don_bg = DonBG.create(self.tex_wrapper, random.randint(0, 5), player_num)
+        self.don_bg_2 = None
+        self.bg_normal = BGNormal.create(self.tex_wrapper, random.randint(0, 4))
+        self.bg_fever = BGFever.create(self.tex_wrapper, random.randint(0, 3))
+        self.footer = Footer(self.tex_wrapper, random.randint(0, 2))
+        self.fever = Fever.create(self.tex_wrapper, random.randint(0, 3), bpm)
+        self.dancer = Dancer.create(self.tex_wrapper, random.randint(0, 20), bpm)
+        self.renda = RendaController(self.tex_wrapper, random.randint(0, 2))
+        self.chibi = ChibiController(self.tex_wrapper, random.randint(0, 13), bpm)
+
+    def _init_collab(self, scene_preset: str, bpm: float, is_two_player: bool) -> None:
+        bg_obj, path, max_dancers = Background.COLLABS[scene_preset]
+        collab_bg = bg_obj(self.tex_wrapper, PlayerNum.P1, bpm, path, max_dancers)
+        self.max_dancers = max_dancers
+        self.don_bg = collab_bg.don_bg
+        self.don_bg_2 = collab_bg.don_bg if is_two_player else None
+        if is_two_player:
+            self._set_shared_none_components()
+        else:
+            self.bg_normal = collab_bg.bg_normal
+            self.bg_fever = collab_bg.bg_fever
+            self.footer = collab_bg.footer
+            self.fever = collab_bg.fever
+            self.dancer = collab_bg.dancer
+        self.renda = collab_bg.renda
+        self.chibi = collab_bg.chibi
+
     def __init__(self, player_num: PlayerNum, bpm: float, scene_preset: str = ''):
         """
         Initialize the background class.
@@ -44,54 +90,13 @@ class Background:
         self.tex_wrapper.load_animations('background')
         if player_num == PlayerNum.TWO_PLAYER:
             if scene_preset == '':
-                self.max_dancers = 5
-                don_bg_num = random.randint(0, 5)
-                self.don_bg = DonBG.create(self.tex_wrapper, don_bg_num, PlayerNum.P1)
-                self.don_bg_2 = DonBG.create(self.tex_wrapper, don_bg_num, PlayerNum.P2)
-                self.renda = RendaController(self.tex_wrapper, random.randint(0, 2))
-                self.chibi = ChibiController(self.tex_wrapper, random.randint(0, 13), bpm)
-                self.bg_normal = None
-                self.bg_fever = None
-                self.footer = None
-                self.fever = None
-                self.dancer = None
+                self._init_two_player_default(bpm)
             else:
-                bg_obj, path, max_dancers = Background.COLLABS[scene_preset]
-                collab_bg = bg_obj(self.tex_wrapper, PlayerNum.P1, bpm, path, max_dancers)
-                self.max_dancers = max_dancers
-                self.don_bg = collab_bg.don_bg
-                self.don_bg_2 = collab_bg.don_bg
-                self.bg_normal = None
-                self.bg_fever = None
-                self.footer = None
-                self.fever = None
-                self.dancer = None
-                self.renda = collab_bg.renda
-                self.chibi = collab_bg.chibi
+                self._init_collab(scene_preset, bpm, is_two_player=True)
         elif scene_preset == '':
-            self.max_dancers = 5
-            self.don_bg = DonBG.create(self.tex_wrapper, random.randint(0, 5), player_num)
-            self.don_bg_2 = None
-            self.bg_normal = BGNormal.create(self.tex_wrapper, random.randint(0, 4))
-            self.bg_fever = BGFever.create(self.tex_wrapper, random.randint(0, 3))
-            self.footer = Footer(self.tex_wrapper, random.randint(0, 2))
-            self.fever = Fever.create(self.tex_wrapper, random.randint(0, 3), bpm)
-            self.dancer = Dancer.create(self.tex_wrapper, random.randint(0, 20), bpm)
-            self.renda = RendaController(self.tex_wrapper, random.randint(0, 2))
-            self.chibi = ChibiController(self.tex_wrapper, random.randint(0, 13), bpm)
+            self._init_single_default(player_num, bpm)
         else:
-            bg_obj, path, max_dancers = Background.COLLABS[scene_preset]
-            collab_bg = bg_obj(self.tex_wrapper, PlayerNum.P1, bpm, path, max_dancers)
-            self.max_dancers = max_dancers
-            self.don_bg = collab_bg.don_bg
-            self.don_bg_2 = None
-            self.bg_normal = collab_bg.bg_normal
-            self.bg_fever = collab_bg.bg_fever
-            self.footer = collab_bg.footer
-            self.fever = collab_bg.fever
-            self.dancer = collab_bg.dancer
-            self.renda = collab_bg.renda
-            self.chibi = collab_bg.chibi
+            self._init_collab(scene_preset, bpm, is_two_player=False)
         self.is_clear = False
         self.is_rainbow = False
         self.last_milestone = 1
@@ -115,7 +120,7 @@ class Background:
         if self.renda is not None:
             self.renda.add_renda()
 
-    def update(self, current_time_ms: float, bpm: float, gauge_1p = None, gauge_2p = None):
+    def update(self, current_time_ms: float, bpm: float, gauge_1p=None, gauge_2p=None):
         """
         Update the background.
 
@@ -128,7 +133,8 @@ class Background:
         if self.dancer is not None and gauge_1p is not None:
             clear_threshold = gauge_1p.clear_start[min(gauge_1p.difficulty, Difficulty.ONI)]
             if gauge_1p.gauge_length < clear_threshold:
-                current_milestone = min(self.max_dancers - 1, int(gauge_1p.gauge_length / (clear_threshold / self.max_dancers)))
+                current_milestone = min(self.max_dancers - 1,
+                                        int(gauge_1p.gauge_length / (clear_threshold / self.max_dancers)))
             else:
                 current_milestone = self.max_dancers
 
@@ -141,7 +147,8 @@ class Background:
                 for _ in range(dancers_to_remove):
                     self.dancer.remove_dancer()
                 self.last_milestone = current_milestone
-                logger.info(f"Dancer milestones lost: {current_milestone}/{self.max_dancers} (removed {dancers_to_remove})")
+                logger.info(
+                    f"Dancer milestones lost: {current_milestone}/{self.max_dancers} (removed {dancers_to_remove})")
         if self.bg_fever is not None and gauge_1p is not None:
             if not self.is_clear and gauge_1p.is_clear:
                 self.bg_fever.start()

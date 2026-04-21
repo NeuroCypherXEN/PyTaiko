@@ -16,6 +16,13 @@ class Transition:
         self.chara_down = global_tex.get_animation(2, is_copy=True)
         self.song_info_fade = global_tex.get_animation(3, is_copy=True)
         self.song_info_fade_out = global_tex.get_animation(4, is_copy=True)
+        self._animations = [
+            self.rainbow_up,
+            self.mini_up,
+            self.chara_down,
+            self.song_info_fade,
+            self.song_info_fade_out,
+        ]
         if title == '' and subtitle == '':
             self.title = ''
             self.subtitle = ''
@@ -24,31 +31,37 @@ class Transition:
             self.subtitle = OutlinedText(subtitle, global_tex.skin_config['transition_subtitle'].font_size, ray.WHITE)
         self.is_second = is_second
 
+    def _has_song_info(self) -> bool:
+        return not (self.title == '' and self.subtitle == '')
+
+    def _song_info_colors(self):
+        if not self.is_second:
+            alpha = self.song_info_fade.attribute
+        else:
+            alpha = self.song_info_fade_out.attribute
+        primary = ray.fade(ray.WHITE, alpha)
+        secondary = ray.fade(ray.WHITE, min(0.70, alpha))
+        return primary, secondary
+
+    def _song_info_offset(self) -> float:
+        if self.is_second:
+            return global_tex.skin_config['transition_offset'].y - self.rainbow_up.attribute
+        return 0
+
     def start(self):
         """Start the transition effect."""
-        self.rainbow_up.start()
-        self.mini_up.start()
-        self.chara_down.start()
-        self.song_info_fade.start()
-        self.song_info_fade_out.start()
+        for animation in self._animations:
+            animation.start()
 
     def update(self, current_time_ms: float):
         """Update the transition effect."""
-        self.rainbow_up.update(current_time_ms)
-        self.chara_down.update(current_time_ms)
-        self.mini_up.update(current_time_ms)
-        self.song_info_fade.update(current_time_ms)
-        self.song_info_fade_out.update(current_time_ms)
+        for animation in self._animations:
+            animation.update(current_time_ms)
         self.is_finished = self.song_info_fade.is_finished
 
     def _draw_song_info(self):
-        color_1 = ray.fade(ray.WHITE, self.song_info_fade.attribute)
-        color_2 = ray.fade(ray.WHITE, min(0.70, self.song_info_fade.attribute))
-        offset = 0
-        if self.is_second:
-            color_1 = ray.fade(ray.WHITE, self.song_info_fade_out.attribute)
-            color_2 = ray.fade(ray.WHITE, min(0.70, self.song_info_fade_out.attribute))
-            offset = global_tex.skin_config['transition_offset'].y - self.rainbow_up.attribute
+        color_1, color_2 = self._song_info_colors()
+        offset = self._song_info_offset()
         global_tex.draw_texture('rainbow_transition', 'text_bg', y=-self.rainbow_up.attribute - offset, color=color_2)
 
         if isinstance(self.title, OutlinedText):
@@ -76,7 +89,7 @@ class Transition:
         if self.is_second:
             offset = self.chara_down.attribute - self.mini_up.attribute//3
             chara_offset = global_tex.skin_config['transition_chara_offset'].y
-        if self.title == '' and self.subtitle == '':
+        if not self._has_song_info():
             return
         global_tex.draw_texture('rainbow_transition', 'chara_left', x=-self.mini_up.attribute//2 - chara_offset, y=-self.mini_up.attribute + offset - total_offset)
         global_tex.draw_texture('rainbow_transition', 'chara_right', x=self.mini_up.attribute//2 + chara_offset, y=-self.mini_up.attribute + offset - total_offset)

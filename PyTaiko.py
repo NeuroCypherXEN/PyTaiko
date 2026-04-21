@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pyray
 import raylib as ray
-from pypresence.presence import Presence
 from raylib.defines import (
     RL_FUNC_ADD,
     RL_ONE,
@@ -18,12 +17,11 @@ from raylib.defines import (
 from libs.audio import audio
 from libs.config import get_config
 from libs.global_data import Difficulty, PlayerNum, ScoreMethod
+from libs.parsers.tja import TJAParser
 from libs.screen import Screen
 from libs.song_hash import DB_VERSION
-from libs.parsers.tja import TJAParser
 from libs.utils import (
     force_dedicated_gpu,
-    get_current_ms,
     global_data,
     global_tex,
 )
@@ -399,14 +397,8 @@ def main():
     logger.info("Cursor hidden")
     last_fps = 1
     last_color = pyray.BLACK
-    last_discord_check = 0
 
     while not ray.WindowShouldClose():
-        current_time = get_current_ms()
-        #if discord_connected and current_time > last_discord_check + 1000:
-            #check_discord_heartbeat(current_screen)
-            #last_discord_check = current_time
-
         if ray.IsKeyPressed(global_data.config["keys"]["fullscreen_key"]):
             ray.ToggleFullscreen()
             logger.info("Toggled fullscreen")
@@ -447,8 +439,6 @@ def main():
 
     ray.CloseWindow()
     audio.close_audio_device()
-    #if discord_connected:
-        #RPC.close()
     global_tex.unload_textures()
     screen_mapping[current_screen].on_screen_end("LOADING")
     logger.info("Window closed and audio device shut down")

@@ -1,7 +1,7 @@
 import logging
 
 from libs.audio import audio
-from libs.file_navigator import SongBox, SongFile
+from libs.file_navigator import Directory, SongBox, SongFile
 from libs.global_data import PlayerNum
 from libs.transition import Transition
 from libs.utils import get_current_ms, global_data
@@ -61,6 +61,9 @@ class TwoPlayerSongSelectScreen(SongSelectScreen):
         elif action == "go_back":
             self.navigator.go_back()
         elif action == "diff_sort":
+            current_item = self.navigator.get_current_item()
+            selected_dir = current_item if isinstance(current_item, Directory) else None
+            self.navigator.rebuild_diff_sort_statistics(selected_dir)
             self.state = State.DIFF_SORTING
             self.diff_sort_selector = DiffSortSelect(self.navigator.diff_sort_statistics, self.navigator.diff_sort_diff, self.navigator.diff_sort_level)
             self.text_fade_in.start()

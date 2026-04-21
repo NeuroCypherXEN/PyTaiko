@@ -10,12 +10,40 @@ from libs.utils import get_current_ms
 
 logger = logging.getLogger(__name__)
 
+STATIC_IMAGE_SUFFIXES = {'.png', '.jpg'}
+TEMP_AUDIO_PATH = Path("cache/temp_audio.wav")
+
+
+def _compute_destination_rect(
+        texture_width: float,
+        texture_height: float,
+        screen_width: float,
+        screen_height: float,
+) -> tuple[float, float, float, float]:
+    """Compute letterboxed destination rectangle while preserving aspect ratio."""
+    texture_aspect = texture_width / texture_height
+    screen_aspect = screen_width / screen_height
+
+    if texture_aspect > screen_aspect:
+        dest_width = screen_width
+        dest_height = screen_width / texture_aspect
+        dest_x = 0
+        dest_y = (screen_height - dest_height) / 2
+    else:
+        dest_height = screen_height
+        dest_width = screen_height * texture_aspect
+        dest_x = (screen_width - dest_width) / 2
+        dest_y = 0
+
+    return dest_x, dest_y, dest_width, dest_height
+
+
 class VideoPlayer:
     def __init__(self, path: Path):
         """Initialize a video player instance"""
         self.is_finished_list = [False, False]
         self.is_static = False
-        if path.suffix == '.png' or path.suffix == '.jpg':
+        if path.suffix in STATIC_IMAGE_SUFFIXES:
             self.texture = ray.LoadTexture(str(path).encode('utf-8'))
             self.is_static = True
             return
@@ -29,7 +57,7 @@ class VideoPlayer:
             audio_container = av.open(str(path))
             audio_stream = audio_container.streams.audio[0]
 
-            output = av.open("cache/temp_audio.wav", 'w')
+            output = av.open(str(TEMP_AUDIO_PATH), 'w')
             output_stream = output.add_stream('pcm_s16le', rate=audio_stream.rate)
 
             for frame in audio_container.decode(audio=0):
@@ -42,7 +70,7 @@ class VideoPlayer:
             output.close()
             audio_container.close()
 
-            self.audio = audio.load_music_stream(Path("cache/temp_audio.wav"), 'video')
+            self.audio = audio.load_music_stream(TEMP_AUDIO_PATH, 'video')
 
         self.texture = None
         self.current_frame_data = None
@@ -199,20 +227,12 @@ class VideoPlayer:
         """Draw video frames to the raylib canvas"""
         if self.texture is not None:
             source = (0, 0, self.texture.width, self.texture.height)
-            texture_aspect = self.texture.width / self.texture.height
-            screen_aspect = tex.screen_width / tex.screen_height
-            if texture_aspect > screen_aspect:
-                dest_width = tex.screen_width
-                dest_height = tex.screen_width / texture_aspect
-                dest_x = 0
-                dest_y = (tex.screen_height - dest_height) / 2
-            else:
-                dest_height = tex.screen_height
-                dest_width = tex.screen_height * texture_aspect
-                dest_x = (tex.screen_width - dest_width) / 2
-                dest_y = 0
-
-            destination = (dest_x, dest_y, dest_width, dest_height)
+            destination = _compute_destination_rect(
+                self.texture.width,
+                self.texture.height,
+                tex.screen_width,
+                tex.screen_height,
+            )
             ray.ClearBackground(ray.BLACK)
             ray.DrawTexturePro(
                 self.texture,
@@ -242,5 +262,5 @@ class VideoPlayer:
                 audio.stop_music_stream(self.audio)
             audio.unload_music_stream(self.audio)
 
-        if Path("cache/temp_audio.wav").exists():
-            Path("cache/temp_audio.wav").unlink()
+        if TEMP_AUDIO_PATH.exists():
+            TEMP_AUDIO_PATH.unlink()

@@ -16,9 +16,11 @@ class PlayerNum(IntEnum):
     DAN = 4
     AI = 5
 
-class ScoreMethod():
+
+class ScoreMethod:
     GEN3 = "gen3"
     SHINUCHI = "shinuchi"
+
 
 class Difficulty(IntEnum):
     EASY = 0
@@ -29,11 +31,13 @@ class Difficulty(IntEnum):
     TOWER = 5
     DAN = 6
 
+
 class Crown(IntEnum):
     NONE = 0
     CLEAR = 1
     FC = 2
     DFC = 3
+
 
 @dataclass
 class Modifiers:
@@ -46,6 +50,7 @@ class Modifiers:
     inverse: bool = False
     random: int = 0
     subdiff: int = 0
+
 
 @dataclass
 class DanResultSong:
@@ -61,14 +66,19 @@ class DanResultSong:
     bad: int = 0
     drumroll: int = 0
 
+
 class DanResultExam:
     """
     Data class for storing dan result exam data.
     """
-    progress: float = 0
-    counter_value: int = 0
-    bar_texture: str = "exam_red"
-    failed: bool = False
+
+    def __init__(self) -> None:
+        # Store as instance attributes to avoid shared class-level mutable state.
+        self.progress: float = 0
+        self.counter_value: int = 0
+        self.bar_texture: str = "exam_red"
+        self.failed: bool = False
+
 
 @dataclass
 class DanResultData:
@@ -83,6 +93,7 @@ class DanResultData:
     songs: list[DanResultSong] = field(default_factory=list)
     exams: list[Any] = field(default_factory=list)
     exam_data: list[DanResultExam] = field(default_factory=list)
+
 
 @dataclass
 class ResultData:
@@ -106,6 +117,7 @@ class ResultData:
     gauge_length: float = 0
     prev_score: int = 0
 
+
 @dataclass
 class SessionData:
     """Data class for storing session data. Wiped after the result screen.
@@ -118,22 +130,27 @@ class SessionData:
     genre_index: The index of the genre being played."""
     selected_song: Path = Path()
     song_hash: str = ""
-    selected_dan: list[tuple[Any, int, int, int]] = field(default_factory=lambda: [])
-    selected_dan_exam: list[Any] = field(default_factory=lambda: [])
+    selected_dan: list[tuple[Any, int, int, int]] = field(default_factory=list)
+    selected_dan_exam: list[Any] = field(default_factory=list)
     dan_color: int = 0
     selected_difficulty: int = 0
     song_title: str = "default_title"
     genre_index: int = 0
-    result_data: ResultData = field(default_factory=lambda: ResultData())
-    dan_result_data: DanResultData = field(default_factory=lambda: DanResultData())
+    result_data: ResultData = field(default_factory=ResultData)
+    dan_result_data: DanResultData = field(default_factory=DanResultData)
 
+
+@dataclass
 class Camera:
-    offset: ray.Vector2 = ray.Vector2(0, 0)
+    """Camera state. default_factory avoids sharing mutable default values."""
+
+    offset: ray.Vector2 = field(default_factory=lambda: ray.Vector2(0, 0))
     zoom: float = 1.0
     h_scale: float = 1.0
     v_scale: float = 1.0
     rotation: float = 0.0
-    border_color: ray.Color = ray.BLACK
+    border_color: ray.Color = field(default_factory=lambda: ray.BLACK)
+
 
 @dataclass
 class GlobalData:
@@ -154,12 +171,12 @@ class GlobalData:
         session_data (list[SessionData]): Session data for both players.
     """
     songs_played: int = 0
-    camera: Camera = Camera()
-    font: ray.Font = ray.get_font_default()
-    font_codepoints = set()
+    camera: Camera = field(default_factory=Camera)
+    font: ray.Font = field(default_factory=ray.get_font_default)
+    font_codepoints: set[int] = field(default_factory=set)
     config: Config = field(default_factory=dict)
-    song_hashes: dict[str, list[dict]] = field(default_factory=lambda: dict()) #Hash to path
-    song_paths: dict[Path, str] = field(default_factory=lambda: dict()) #path to hash
+    song_hashes: dict[str, list[dict]] = field(default_factory=dict)  # Hash -> metadata
+    song_paths: dict[Path, str] = field(default_factory=dict)  # path -> hash
     score_db: str = ""
     song_progress: float = 0.0
     total_songs: int = 0
@@ -169,7 +186,9 @@ class GlobalData:
     modifiers: list[Modifiers] = field(default_factory=lambda: [Modifiers(), Modifiers(), Modifiers()])
     session_data: list[SessionData] = field(default_factory=lambda: [SessionData(), SessionData(), SessionData()])
 
+
 global_data = GlobalData()
+
 
 def reset_session():
     """Reset the session data."""

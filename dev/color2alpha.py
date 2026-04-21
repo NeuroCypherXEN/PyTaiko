@@ -1,5 +1,6 @@
-from PIL import Image
 import numpy as np
+from PIL import Image
+
 
 def gimp_color_to_alpha_exact(image_path, target_color=(0, 0, 0), output_path=None):
     """
@@ -95,7 +96,7 @@ def gimp_color_to_alpha_vectorized(image_path, target_color=(0, 0, 0), output_pa
     target = np.array(target_color, dtype=np.float64) / 255.0
     tr, tg, tb = target[0], target[1], target[2]
 
-    r, g, b, a = data[:,:,0], data[:,:,1], data[:,:,2], data[:,:,3]
+    r, g, b, a = data[:, :, 0], data[:, :, 1], data[:, :, 2], data[:, :, 3]
 
     if tr == 0.0 and tg == 0.0 and tb == 0.0:
         # Special case for black target - vectorized
@@ -110,10 +111,10 @@ def gimp_color_to_alpha_vectorized(image_path, target_color=(0, 0, 0), output_pa
         new_b = np.where(new_alpha > 0, b / safe_alpha, 0)
 
         # Apply new values
-        data[:,:,0] = new_r
-        data[:,:,1] = new_g
-        data[:,:,2] = new_b
-        data[:,:,3] = new_alpha * a
+        data[:, :, 0] = new_r
+        data[:, :, 1] = new_g
+        data[:, :, 2] = new_b
+        data[:, :, 3] = new_alpha * a
 
     else:
         # General case for non-black colors - vectorized
@@ -129,10 +130,10 @@ def gimp_color_to_alpha_vectorized(image_path, target_color=(0, 0, 0), output_pa
         new_g = np.where(new_alpha > 0, (g - tg) / safe_alpha + tg, tg)
         new_b = np.where(new_alpha > 0, (b - tb) / safe_alpha + tb, tb)
 
-        data[:,:,0] = new_r
-        data[:,:,1] = new_g
-        data[:,:,2] = new_b
-        data[:,:,3] = new_alpha * a
+        data[:, :, 0] = new_r
+        data[:, :, 1] = new_g
+        data[:, :, 2] = new_b
+        data[:, :, 3] = new_alpha * a
 
     # Convert back to uint8
     data = np.clip(data * 255.0, 0, 255).astype(np.uint8)
@@ -146,8 +147,6 @@ def gimp_color_to_alpha_vectorized(image_path, target_color=(0, 0, 0), output_pa
 # Usage examples
 if __name__ == "__main__":
     # Basic usage - convert black to alpha
-
-    #for i in range(13):
-    gimp_color_to_alpha_exact("gradient_clear.png", output_path= "gradient_clear.png")
+    gimp_color_to_alpha_exact("gradient_clear.png", output_path="gradient_clear.png")
 
     print("Color to Alpha processing complete!")

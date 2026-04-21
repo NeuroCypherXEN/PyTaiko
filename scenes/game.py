@@ -24,8 +24,6 @@ from libs.global_data import (
 )
 from libs.global_objects import AllNetIcon, Nameplate
 from libs.parsers.osz import OsuParser
-from libs.screen import Screen
-from libs.texture import tex
 from libs.parsers.tja import (
     Balloon,
     Drumroll,
@@ -37,6 +35,8 @@ from libs.parsers.tja import (
     apply_modifiers,
     calculate_base_score,
 )
+from libs.screen import Screen
+from libs.texture import tex
 from libs.transition import Transition
 from libs.utils import (
     OutlinedText,
@@ -725,13 +725,13 @@ class Player:
                         self.draw_note_list if self.draw_note_list else []
                     ]
 
-                    seen_notes = set()
+                    seen_note_indices: set[int] = set()
                     for notes in note_lists:
                         for note in notes:
                             if note.type <= 4 and start_time <= note.hit_ms < branch_start_time:
-                                seen_notes.add(note)
+                                seen_note_indices.add(note.index)
 
-                    self.curr_branch_reqs = [e_req, m_req, branch_start_time, max(len(seen_notes), 1)]
+                    self.curr_branch_reqs = [e_req, m_req, branch_start_time, max(len(seen_note_indices), 1)]
     def play_note_manager(self, current_ms: float, background: Optional[Background]):
         """Manages the play_notes and removes if necessary"""
         if self.don_notes and self.don_notes[0].hit_ms + Player.TIMING_BAD < current_ms:

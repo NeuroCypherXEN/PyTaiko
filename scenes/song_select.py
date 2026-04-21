@@ -28,6 +28,7 @@ from libs.global_objects import (
     Timer,
 )
 from libs.screen import Screen
+from libs.song_hash import get_diff_hash
 from libs.texture import tex
 from libs.transition import Transition
 from libs.utils import (
@@ -119,7 +120,13 @@ class SongSelectScreen(Screen):
 
     def finalize_song(self, current_item: SongFile | SongFileOsu):
         global_data.session_data[global_data.player_num].selected_song = current_item.path
-        global_data.session_data[global_data.player_num].song_hash = global_data.song_hashes[current_item.hash][0]["diff_hashes"][self.player_1.selected_difficulty]
+        diff_hash = get_diff_hash(current_item.hash, self.player_1.selected_difficulty, current_item.path)
+        if diff_hash is None:
+            logger.warning(
+                f"Failed to resolve diff hash for {current_item.path} diff={self.player_1.selected_difficulty}; using fallback entry"
+            )
+            diff_hash = global_data.song_hashes[current_item.hash][0]["diff_hashes"][self.player_1.selected_difficulty]
+        global_data.session_data[global_data.player_num].song_hash = diff_hash
         global_data.session_data[global_data.player_num].selected_difficulty = self.player_1.selected_difficulty
         global_data.session_data[global_data.player_num].genre_index = current_item.box.genre_index
 
@@ -166,6 +173,9 @@ class SongSelectScreen(Screen):
         elif action == "go_back":
             self.navigator.go_back()
         elif action == "diff_sort":
+            current_item = self.navigator.get_current_item()
+            selected_dir = current_item if isinstance(current_item, Directory) else None
+            self.navigator.rebuild_diff_sort_statistics(selected_dir)
             self.state = State.DIFF_SORTING
             self.diff_sort_selector = DiffSortSelect(self.navigator.diff_sort_statistics, self.navigator.diff_sort_diff, self.navigator.diff_sort_level)
             self.text_fade_in.start()

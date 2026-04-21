@@ -12,6 +12,14 @@ from libs.config import get_config
 
 logger = logging.getLogger(__name__)
 
+
+def _configure_texture(texture: Any) -> None:
+    """Apply common texture setup after loading."""
+    ray.GenTextureMipmaps(ray.ffi.addressof(texture))
+    ray.SetTextureFilter(texture, ray.TEXTURE_FILTER_TRILINEAR)
+    ray.SetTextureWrap(texture, ray.TEXTURE_WRAP_CLAMP)
+
+
 class SkinInfo:
     def __init__(self, x: float, y: float, font_size: int, width: float, height: float, text: dict[str, str]):
         self.x = x
@@ -32,9 +40,7 @@ class Texture:
         self.init_vals = init_vals
         self.width = self.texture.width
         self.height = self.texture.height
-        ray.GenTextureMipmaps(ray.ffi.addressof(self.texture))
-        ray.SetTextureFilter(self.texture, ray.TEXTURE_FILTER_TRILINEAR)
-        ray.SetTextureWrap(self.texture, ray.TEXTURE_WRAP_CLAMP)
+        _configure_texture(self.texture)
 
         self.x: list[int] = [0]
         self.y: list[int] = [0]
@@ -54,9 +60,7 @@ class FramedTexture:
         self.width = self.texture[0].width
         self.height = self.texture[0].height
         for texture_data in self.texture:
-            ray.GenTextureMipmaps(ray.ffi.addressof(texture_data))
-            ray.SetTextureFilter(texture_data, ray.TEXTURE_FILTER_TRILINEAR)
-            ray.SetTextureWrap(texture_data, ray.TEXTURE_WRAP_CLAMP)
+            _configure_texture(texture_data)
         self.x: list[int] = [0]
         self.y: list[int] = [0]
         self.x2: list[int] = [self.width]
@@ -70,7 +74,8 @@ class TextureWrapper:
         self.textures: dict[str, dict[str, Texture | FramedTexture]] = dict()
         self.animations: dict[int, BaseAnimation] = dict()
         self.skin_config: dict[str, SkinInfo] = dict()
-        self.graphics_path = Path(f'Skins/{get_config()['paths']['skin']}/Graphics')
+        skin_name = get_config()['paths']['skin']
+        self.graphics_path = Path(f"Skins/{skin_name}/Graphics")
         if not self.graphics_path.exists():
             logger.error("No skin has been configured")
             self.screen_width = 1280
@@ -78,7 +83,7 @@ class TextureWrapper:
             self.screen_scale = 1.0
             self.skin_config = dict()
             return
-        self.parent_graphics_path = Path(f'Skins/{get_config()['paths']['skin']}/Graphics')
+        self.parent_graphics_path = self.graphics_path
         if not (self.graphics_path / "skin_config.json").exists():
             raise Exception("skin is missing a skin_config.json")
 
@@ -91,29 +96,51 @@ class TextureWrapper:
         self.screen_scale = self.screen_width / 1280
         if "parent" in data["screen"]:
             parent = data["screen"]["parent"]
-            self.parent_graphics_path = Path("Skins") / parent
-            parent_data = json.loads((self.parent_graphics_path / "skin_config.json").read_text(encoding='utf-8'))
-            for k, v in parent_data.items():
-                self.skin_config[k] = SkinInfo(v.get('x', 0) * self.screen_scale, v.get('y', 0) * self.screen_scale, v.get('font_size', 0) * self.screen_scale, v.get('width', 0) * self.screen_scale, v.get('height', 0) * self.screen_scale, v.get('text', dict()))
+            # Support both parent="SkinName" and parent="SkinName/Graphics" formats.
+            parent_path = Path(f"Skins/{parent}")
+            if (parent_path / "Graphics").exists():
+                parent_path = parent_path / "Graphics"
+            self.parent_graphics_path = parent_path
+
+            parent_cfg = self.parent_graphics_path / "skin_config.json"
+            if parent_cfg.exists():
+                parent_data = json.loads(parent_cfg.read_text(encoding='utf-8'))
+                for k, v in parent_data.items():
+                    self.skin_config[k] = SkinInfo(
+                        v.get('x', 0) * self.screen_scale,
+                        v.get('y', 0) * self.screen_scale,
+                        v.get('font_size', 0) * self.screen_scale,
+                        v.get('width', 0) * self.screen_scale,
+                        v.get('height', 0) * self.screen_scale,
+                        v.get('text', dict()),
+                    )
+            else:
+                logger.warning(f"Parent skin config not found: {parent_cfg}")
 
     def unload_textures(self):
         """Unload all textures and animations."""
         ids = {}  # Map ID to texture name
-        for zip in self.textures:
-            for file in self.textures[zip]:
-                tex_object = self.textures[zip][file]
+        for subset_name in self.textures:
+            for texture_name in self.textures[subset_name]:
+                tex_object = self.textures[subset_name][texture_name]
                 if isinstance(tex_object.texture, list):
                     for i, texture in enumerate(tex_object.texture):
                         if texture.id in ids:
-                            logger.warning(f"Duplicate texture ID {texture.id}: {ids[texture.id]} and {zip}/{file}[{i}]")
+                            logger.warning(
+                                f"Duplicate texture ID {texture.id}: "
+                                f"{ids[texture.id]} and {subset_name}/{texture_name}[{i}]"
+                            )
                         else:
-                            ids[texture.id] = f"{zip}/{file}[{i}]"
+                            ids[texture.id] = f"{subset_name}/{texture_name}[{i}]"
                             ray.UnloadTexture(texture)
                 else:
                     if tex_object.texture.id in ids:
-                        logger.warning(f"Duplicate texture ID {tex_object.texture.id}: {ids[tex_object.texture.id]} and {zip}/{file}")
+                        logger.warning(
+                            f"Duplicate texture ID {tex_object.texture.id}: "
+                            f"{ids[tex_object.texture.id]} and {subset_name}/{texture_name}"
+                        )
                     else:
-                        ids[tex_object.texture.id] = f"{zip}/{file}"
+                        ids[tex_object.texture.id] = f"{subset_name}/{texture_name}"
                         ray.UnloadTexture(tex_object.texture)
 
         self.textures.clear()
@@ -137,23 +164,28 @@ class TextureWrapper:
 
     def _read_tex_obj_data(self, tex_mapping: dict | list, tex_object: Texture | FramedTexture):
         if isinstance(tex_mapping, list):
-            for i in range(len(tex_mapping)):
+            if not tex_mapping:
+                return
+            for i, mapping in enumerate(tex_mapping):
                 if i == 0:
-                    tex_object.x[i] = tex_mapping[i].get("x", 0)
-                    tex_object.y[i] = tex_mapping[i].get("y", 0)
-                    tex_object.x2[i] = tex_mapping[i].get("x2", tex_object.width)
-                    tex_object.y2[i] = tex_mapping[i].get("y2", tex_object.height)
-                    tex_object.controllable[i] = tex_mapping[i].get("controllable", False)
+                    tex_object.x[i] = mapping.get("x", 0)
+                    tex_object.y[i] = mapping.get("y", 0)
+                    tex_object.x2[i] = mapping.get("x2", tex_object.width)
+                    tex_object.y2[i] = mapping.get("y2", tex_object.height)
+                    tex_object.controllable[i] = mapping.get("controllable", False)
                 else:
-                    tex_object.x.append(tex_mapping[i].get("x", 0))
-                    tex_object.y.append(tex_mapping[i].get("y", 0))
-                    tex_object.x2.append(tex_mapping[i].get("x2", tex_object.width))
-                    tex_object.y2.append(tex_mapping[i].get("y2", tex_object.height))
-                    tex_object.controllable.append(tex_mapping[i].get("controllable", False))
-                if "frame_order" in tex_mapping[i]:
-                    tex_object.texture = list(map(lambda j: tex_object.texture[j], tex_mapping[i]["frame_order"]))
-                if "crop" in tex_mapping[0]:
-                    tex_object.crop_data = tex_mapping[0]["crop"]
+                    tex_object.x.append(mapping.get("x", 0))
+                    tex_object.y.append(mapping.get("y", 0))
+                    tex_object.x2.append(mapping.get("x2", tex_object.width))
+                    tex_object.y2.append(mapping.get("y2", tex_object.height))
+                    tex_object.controllable.append(mapping.get("controllable", False))
+
+                if "frame_order" in mapping and isinstance(tex_object, FramedTexture):
+                    tex_object.texture = [tex_object.texture[j] for j in mapping["frame_order"]]
+
+            if "crop" in tex_mapping[0]:
+                tex_object.crop_data = tex_mapping[0]["crop"]
+                for i in range(len(tex_object.x2)):
                     tex_object.x2[i] = tex_object.crop_data[0][2]
                     tex_object.y2[i] = tex_object.crop_data[0][3]
         else:
@@ -163,7 +195,7 @@ class TextureWrapper:
             tex_object.y2 = [tex_mapping.get("y2", tex_object.height)]
             tex_object.controllable = [tex_mapping.get("controllable", False)]
             if "frame_order" in tex_mapping and isinstance(tex_object, FramedTexture):
-                tex_object.texture = list(map(lambda i: tex_object.texture[i], tex_mapping["frame_order"]))
+                tex_object.texture = [tex_object.texture[i] for i in tex_mapping["frame_order"]]
             if "crop" in tex_mapping:
                 tex_object.crop_data = tex_mapping["crop"]
                 tex_object.x2 = [tex_object.crop_data[0][2]]
@@ -187,10 +219,11 @@ class TextureWrapper:
                 self.animations = parse_animations(anim_json)
             logger.info(f"Animations loaded for screen: {screen_name} (from parent)")
 
-    # TODO: rename to load_folder, add parent_folder logic
-    def load_zip(self, screen_name: str, subset: str):
-        folder = (self.graphics_path / screen_name / subset)
-        if screen_name in self.textures and subset in self.textures[screen_name]:
+    # TODO: rename to load_folder
+    def load_zip(self, screen_name: str, subset: str, root_graphics_path: Optional[Path] = None):
+        base_path = root_graphics_path or self.graphics_path
+        folder = base_path / screen_name / subset
+        if folder.stem in self.textures:
             return
         try:
             if not (folder / 'texture.json').exists():
@@ -217,25 +250,34 @@ class TextureWrapper:
                     self._read_tex_obj_data(tex_mapping, self.textures[folder.stem][tex_name])
                 else:
                     logger.error(f"Texture {tex_name} was not found in {folder}")
-            logger.info(f"Textures loaded from zip: {folder}")
+            logger.info(f"Textures loaded from folder: {folder}")
         except Exception as e:
-            logger.error(f"Failed to load textures from zip {folder}: {e}")
+            logger.error(f"Failed to load textures from folder {folder}: {e}")
 
     def load_screen_textures(self, screen_name: str) -> None:
         """Load textures for a screen."""
         screen_path = self.graphics_path / screen_name
+        parent_screen_path = self.parent_graphics_path / screen_name
 
         if not screen_path.exists():
-            logger.warning(f"Textures for Screen {screen_name} do not exist")
-            return
+            if self.parent_graphics_path != self.graphics_path and parent_screen_path.exists():
+                logger.info(f"Textures for screen {screen_name} loaded from parent skin")
+            else:
+                logger.warning(f"Textures for Screen {screen_name} do not exist")
+                return
 
         # Load animations
         self.load_animations(screen_name)
 
-        # Load zip files from child screen path only
-        for zip_file in screen_path.iterdir():
-            if zip_file.is_dir():
-                self.load_zip(screen_name, zip_file.stem)
+        # Load child skin subsets first, then fill missing subsets from the parent skin.
+        if screen_path.exists():
+            for subset_dir in screen_path.iterdir():
+                if subset_dir.is_dir():
+                    self.load_zip(screen_name, subset_dir.stem, self.graphics_path)
+        if self.parent_graphics_path != self.graphics_path and parent_screen_path.exists():
+            for subset_dir in parent_screen_path.iterdir():
+                if subset_dir.is_dir():
+                    self.load_zip(screen_name, subset_dir.stem, self.parent_graphics_path)
 
         logger.info(f"Screen textures loaded for: {screen_name}")
 

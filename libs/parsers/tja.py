@@ -15,10 +15,11 @@ from libs.utils import strip_comments
 @lru_cache(maxsize=64)
 def get_ms_per_measure(bpm_val: float, time_sig: float):
     """Calculate the number of milliseconds per measure."""
-    #https://gist.github.com/KatieFrogs/e000f406bbc70a12f3c34a07303eec8b#measure
+    # https://gist.github.com/KatieFrogs/e000f406bbc70a12f3c34a07303eec8b#measure
     if bpm_val == 0:
         return 0
     return 60000 * (time_sig * 4) / bpm_val
+
 
 class NoteType(IntEnum):
     NONE = 0
@@ -32,10 +33,12 @@ class NoteType(IntEnum):
     TAIL = 8
     KUSUDAMA = 9
 
+
 class ScrollType(IntEnum):
     NMSCROLL = 0
     BMSCROLL = 1
     HBSCROLL = 2
+
 
 @dataclass()
 class TimelineObject:
@@ -130,6 +133,7 @@ class Note:
     def __repr__(self):
         return str(self.__dict__)
 
+
 @dataclass
 class Drumroll(Note):
     """A drumroll note in a TJA file.
@@ -151,6 +155,7 @@ class Drumroll(Note):
         for field_name in [f.name for f in fields(Note)]:
             if hasattr(self._source_note, field_name):
                 setattr(self, field_name, getattr(self._source_note, field_name))
+
 
 @dataclass
 class Balloon(Note):
@@ -191,6 +196,7 @@ class Balloon(Note):
         hash_string = str(field_values)
         return hash_string.encode('utf-8')
 
+
 @dataclass
 class NoteList:
     """A collection of notes
@@ -217,6 +223,7 @@ class NoteList:
         self.timeline += other.timeline
         return self
 
+
 @dataclass
 class CourseData:
     """A collection of course metadata
@@ -231,6 +238,7 @@ class CourseData:
     scoreinit: list[int] = field(default_factory=lambda: [])
     scorediff: int = 0
     is_branching: bool = False
+
 
 @dataclass
 class TJAMetadata:
@@ -247,8 +255,8 @@ class TJAMetadata:
     scene_preset: background for the song
     course_data: dictionary of course metadata, accessed by diff number
     """
-    title: dict[str, str] = field(default_factory= lambda: {'en': ''})
-    subtitle: dict[str, str] = field(default_factory= lambda: {'en': ''})
+    title: dict[str, str] = field(default_factory=lambda: {'en': ''})
+    subtitle: dict[str, str] = field(default_factory=lambda: {'en': ''})
     genre: str = ''
     wave: Path = Path()
     demostart: float = 0.0
@@ -259,12 +267,13 @@ class TJAMetadata:
     scene_preset: str = ''
     course_data: dict[int, CourseData] = field(default_factory=dict)
 
+
 @dataclass
 class TJAEXData:
     """Extra data for TJA files
     new_audio: Contains the word "-New Audio-" in any song title
     old_audio: Contains the word "-Old Audio-" in any song title
-    limited_time: Contains the word "限定" in any song title or subtitle
+    limited_time: Contains limited-time marker text in any song title or subtitle
     new: If the TJA file has been created or modified in the last week"""
     new_audio: bool = False
     old_audio: bool = False
@@ -286,10 +295,10 @@ def calculate_base_score(notes: NoteList) -> int:
     drumroll_msec = 0
     for i in range(len(notes.play_notes)):
         note = notes.play_notes[i]
-        if i < len(notes.play_notes)-1:
-            next_note = notes.play_notes[i+1]
+        if i < len(notes.play_notes) - 1:
+            next_note = notes.play_notes[i + 1]
         else:
-            next_note = notes.play_notes[len(notes.play_notes)-1]
+            next_note = notes.play_notes[len(notes.play_notes) - 1]
         if isinstance(note, Drumroll):
             drumroll_msec += (next_note.hit_ms - note.hit_ms)
         elif isinstance(note, Balloon):
@@ -300,7 +309,9 @@ def calculate_base_score(notes: NoteList) -> int:
             total_notes += 1
     if total_notes == 0:
         return 1000000
-    return math.ceil((1000000 - (balloon_count * 100) - (16.920079999994086 * drumroll_msec / 1000 * 100)) / total_notes / 10) * 10
+    return math.ceil(
+        (1000000 - (balloon_count * 100) - (16.920079999994086 * drumroll_msec / 1000 * 100)) / total_notes / 10) * 10
+
 
 def test_encodings(file_path: Path):
     """Test the encoding of a file by trying different encodings.
@@ -323,11 +334,13 @@ def test_encodings(file_path: Path):
             continue
     return final_encoding
 
+
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ParserState:
-    time_signature: float = 4/4
+    time_signature: float = 4 / 4
     bpm: float = 120
     bpmchange_last_bpm: float = 120
     scroll_x_modifier: float = 1
@@ -353,12 +366,13 @@ class ParserState:
     is_section_start: bool = False
     start_branch_ms: float = 0.0
     start_branch_bpm: float = 120
-    start_branch_time_sig: float = 4/4
+    start_branch_time_sig: float = 4 / 4
     start_branch_x_scroll: float = 1.0
     start_branch_y_scroll: float = 0.0
     start_branch_barline: bool = False
     branch_balloon_index: int = 0
     section_bar: Optional[Note] = None
+
 
 class TJAParser:
     """Parse a TJA file and extract metadata and data.
@@ -374,6 +388,7 @@ class TJAParser:
         data (list): The data extracted from the TJA file.
     """
     DIFFS = {0: "easy", 1: "normal", 2: "hard", 3: "oni", 4: "edit", 5: "tower", 6: "dan"}
+
     def __init__(self, path: Path, start_delay: int = 0):
         """
         Initialize a TJA object.
@@ -424,14 +439,14 @@ class TJAParser:
             elif item.startswith('SUBTITLE'):
                 region_code = 'en'
                 if item[len('SUBTITLE')] != ':':
-                    region_code = (item[len('SUBTITLE'):len('SUBTITLE')+2]).lower()
+                    region_code = (item[len('SUBTITLE'):len('SUBTITLE') + 2]).lower()
                 self.metadata.subtitle[region_code] = ''.join(item.split(':')[1:]).replace('--', '')
                 if 'ja' in self.metadata.subtitle and '限定' in self.metadata.subtitle['ja']:
                     self.ex_data.limited_time = True
             elif item.startswith('TITLE'):
                 region_code = 'en'
                 if item[len('TITLE')] != ':':
-                    region_code = (item[len('TITLE'):len('TITLE')+2]).lower()
+                    region_code = (item[len('TITLE'):len('TITLE') + 2]).lower()
                 self.metadata.title[region_code] = ''.join(item.split(':')[1:])
             elif item.startswith('BPM'):
                 data = item.split(':')[1]
@@ -512,19 +527,23 @@ class TJAParser:
                     if balloon_data == '':
                         logger.debug(f"Invalid BALLOONNOR value: {balloon_data} in TJA file {self.file_path}")
                         continue
-                    self.metadata.course_data[current_diff].balloon.extend([int(x) for x in balloon_data.replace('.', ',').split(',') if x != ''])
+                    self.metadata.course_data[current_diff].balloon.extend(
+                        [int(x) for x in balloon_data.replace('.', ',').split(',') if x != ''])
                 elif item.startswith('BALLOONEXP'):
                     balloon_data = item.split(':')[1]
                     if balloon_data == '':
                         logger.debug(f"Invalid BALLOONEXP value: {balloon_data} in TJA file {self.file_path}")
                         continue
-                    self.metadata.course_data[current_diff].balloon.extend([int(x) for x in balloon_data.replace('.', ',').split(',') if x != ''])
+                    self.metadata.course_data[current_diff].balloon.extend(
+                        [int(x) for x in balloon_data.replace('.', ',').split(',') if x != ''])
                 elif item.startswith('BALLOONMAS'):
                     balloon_data = item.split(':')[1]
                     if balloon_data == '':
                         logger.debug(f"Invalid BALLOONMAS value: {balloon_data} in TJA file {self.file_path}")
                         continue
-                    self.metadata.course_data[current_diff].balloon = [int(x) for x in balloon_data.replace('.', ',').split(',') if x != '']
+                    self.metadata.course_data[current_diff].balloon = [int(x) for x in
+                                                                       balloon_data.replace('.', ',').split(',') if
+                                                                       x != '']
                 elif item.startswith('BALLOON'):
                     if item.find(':') == -1:
                         self.metadata.course_data[current_diff].balloon = []
@@ -532,13 +551,17 @@ class TJAParser:
                     balloon_data = item.split(':')[1]
                     if balloon_data == '':
                         continue
-                    self.metadata.course_data[current_diff].balloon = [int(x) for x in balloon_data.replace('.', ',').split(',') if x != '']
+                    self.metadata.course_data[current_diff].balloon = [int(x) for x in
+                                                                       balloon_data.replace('.', ',').split(',') if
+                                                                       x != '']
                 elif item.startswith('SCOREINIT'):
                     score_init = item.split(':')[1]
                     if score_init == '':
                         continue
                     try:
-                        self.metadata.course_data[current_diff].scoreinit = [int(x) for x in score_init.replace('.', ',').split(',') if x != '']
+                        self.metadata.course_data[current_diff].scoreinit = [int(x) for x in
+                                                                             score_init.replace('.', ',').split(',') if
+                                                                             x != '']
                     except Exception as e:
                         logger.error(f"Failed to parse SCOREINIT: {e} in TJA file {self.file_path}")
                         self.metadata.course_data[current_diff].scoreinit = [0, 0]
@@ -636,7 +659,7 @@ class TJAParser:
 
     def get_moji(self, play_note_list: list[Note], ms_per_measure: float) -> None:
         """
-        Assign 口唱歌 (note phoneticization) to notes.
+        Assign kuchi-shoga style phonetic syllables to notes.
         Args:
             play_note_list (list[Note]): The list of notes to process.
             ms_per_measure (float): The duration of a measure in milliseconds.
@@ -683,14 +706,14 @@ class TJAParser:
             notes_minus_3 = play_note_list[-3]
             notes_minus_2 = play_note_list[-2]
             consecutive_ones = (
-                notes_minus_4.type == 1 and
-                notes_minus_3.type == 1 and
-                notes_minus_2.type == 1
+                    notes_minus_4.type == 1 and
+                    notes_minus_3.type == 1 and
+                    notes_minus_2.type == 1
             )
             if consecutive_ones:
                 rapid_timing = (
-                    notes_minus_3.hit_ms - notes_minus_4.hit_ms < (ms_per_measure / 8) and
-                    notes_minus_2.hit_ms - notes_minus_3.hit_ms < (ms_per_measure / 8)
+                        notes_minus_3.hit_ms - notes_minus_4.hit_ms < (ms_per_measure / 8) and
+                        notes_minus_2.hit_ms - notes_minus_3.hit_ms < (ms_per_measure / 8)
                 )
                 if rapid_timing:
                     if len(play_note_list) > 5:
@@ -807,9 +830,9 @@ class TJAParser:
                 bar_list.append(bar_line)
 
         for bars in [state.curr_bar_list,
-                        self.branch_m[-1].bars if self.branch_m else None,
-                        self.branch_e[-1].bars if self.branch_e else None,
-                        self.branch_n[-1].bars if self.branch_n else None]:
+                     self.branch_m[-1].bars if self.branch_m else None,
+                     self.branch_e[-1].bars if self.branch_e else None,
+                     self.branch_n[-1].bars if self.branch_n else None]:
             set_branch_params(bars, branch_params, state.section_bar)
         if state.section_bar:
             state.section_bar = None
@@ -1118,6 +1141,7 @@ class TJAParser:
 
         return n.hexdigest()
 
+
 def modifier_speed(notes: NoteList, value: float):
     """Modifies the speed of the notes in the given NoteList."""
     modded_notes = notes.draw_notes.copy()
@@ -1128,12 +1152,14 @@ def modifier_speed(notes: NoteList, value: float):
         bar.scroll_x *= value
     return modded_notes, modded_bars
 
+
 def modifier_display(notes: NoteList):
     """Modifies the display of the notes in the given NoteList."""
     modded_notes = notes.draw_notes.copy()
     for note in modded_notes:
         note.display = False
     return modded_notes
+
 
 def modifier_inverse(notes: NoteList):
     """Inverts the type of the notes in the given NoteList."""
@@ -1143,6 +1169,7 @@ def modifier_inverse(notes: NoteList):
         if note.type in type_mapping:
             note.type = type_mapping[note.type]
     return modded_notes
+
 
 def modifier_random(notes: NoteList, value: int):
     """Randomly modifies the type of the notes in the given NoteList.
@@ -1156,6 +1183,7 @@ def modifier_random(notes: NoteList, value: int):
             modded_notes[i].type = type_mapping[modded_notes[i].type]
     return modded_notes
 
+
 def apply_modifiers(notes: NoteList, modifiers: Modifiers):
     """Applies all selected modifiers from global_data to the given NoteList."""
     if modifiers.display:
@@ -1168,6 +1196,7 @@ def apply_modifiers(notes: NoteList, modifiers: Modifiers):
     draw_notes = modifier_difficulty(notes, modifiers.subdiff)
     return play_notes, draw_notes, bars
 
+
 class Interval(IntEnum):
     UNKNOWN = 0
     QUARTER = 1
@@ -1176,6 +1205,7 @@ class Interval(IntEnum):
     SIXTEENTH = 4
     TWENTYFOURTH = 6
     THIRTYSECOND = 8
+
 
 def modifier_difficulty(notes: NoteList, level: int):
     """Modifies notes based on difficulty level according to the difficulty table.
@@ -1355,7 +1385,8 @@ def modifier_difficulty(notes: NoteList, level: int):
                     # Check if there's a gap after the 4th note
                     if note_indices[3] + 1 < len(modded_notes):
                         if not isinstance(modded_notes[note_indices[3] + 1], (Drumroll, Balloon)):
-                            interval_after = modded_notes[note_indices[3] + 1].hit_ms - modded_notes[note_indices[3]].hit_ms
+                            interval_after = modded_notes[note_indices[3] + 1].hit_ms - modded_notes[
+                                note_indices[3]].hit_ms
                             type_after = get_note_interval_type(interval_after, modded_notes[note_indices[3]].bpm)
                             # Gap after should be at least the size of the interval
                             if interval_after >= target_interval * 1.5 or type_after != interval_type:
@@ -1398,7 +1429,7 @@ def modifier_difficulty(notes: NoteList, level: int):
             if length == 3:
                 modded_notes[start + 1].type = NoteType.NONE
             elif length == 5:
-                #3+1 if start with don, 2+2 if start with kat
+                # 3+1 if start with don, 2+2 if start with kat
                 if modded_notes[start].type in [NoteType.DON, NoteType.DON_L]:
                     modded_notes[start + 3].type = NoteType.NONE
                 else:

@@ -1,11 +1,12 @@
 import configparser
 import csv
+import hashlib
 import json
 import logging
 import sqlite3
 import time
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 from libs.config import get_config
 from libs.global_data import Crown
@@ -16,6 +17,7 @@ from libs.utils import global_data
 logger = logging.getLogger(__name__)
 DB_VERSION = 1
 
+
 def diff_hashes_object_hook(obj):
     if "diff_hashes" in obj:
         obj["diff_hashes"] = {
@@ -24,9 +26,38 @@ def diff_hashes_object_hook(obj):
         }
     return obj
 
+
 class DiffHashesDecoder(json.JSONDecoder):
     def __init__(self, *args, **kwargs):
         super().__init__(object_hook=diff_hashes_object_hook, *args, **kwargs)
+
+
+def get_song_hash_entry(song_hash: str, file_path: Path | str | None = None) -> dict | None:
+    """Return the metadata entry for a hash, preferring an exact file_path match."""
+    entries = global_data.song_hashes.get(song_hash)
+    if not entries:
+        return None
+
+    if file_path is None:
+        return entries[0]
+
+    path_str = str(file_path)
+    for entry in entries:
+        if entry.get("file_path") == path_str:
+            return entry
+
+    return entries[0]
+
+
+def get_diff_hash(song_hash: str, diff: int, file_path: Path | str | None = None) -> str | None:
+    """Return difficulty hash for a song, with optional file_path disambiguation."""
+    entry = get_song_hash_entry(song_hash, file_path)
+    if entry is None:
+        return None
+
+    diff_hashes = entry.get("diff_hashes", {})
+    return diff_hashes.get(diff)
+
 
 def get_db_version():
     with sqlite3.connect(global_data.score_db) as con:
@@ -35,10 +66,12 @@ def get_db_version():
         version = cursor.fetchone()[0]
         return version
 
+
 def update_db_version():
     with sqlite3.connect(global_data.score_db) as con:
         cursor = con.cursor()
         cursor.execute(f'PRAGMA user_version = {DB_VERSION}')
+
 
 def read_tjap3_score(input_file: Path):
     """Read a TJAPlayer3 score.ini file and return the scores and clears."""
@@ -56,11 +89,11 @@ def read_tjap3_score(input_file: Path):
               int(score_ini['HiScore.Drums'].get('Clear3', 0)),
               int(score_ini['HiScore.Drums'].get('Clear4', 0))]
     if score_ini['HiScore.Drums']['PerfectRange'] != 25:
-        return [0],[0], None
+        return [0], [0], None
     if score_ini['HiScore.Drums']['GoodRange'] != 75:
-        return [0],[0], None
+        return [0], [0], None
     if score_ini['HiScore.Drums']['PoorRange'] != 108:
-        return [0],[0], None
+        return [0], [0], None
     if score_ini['HiScore.Drums']['Perfect'] != 0:
         good = score_ini['HiScore.Drums'].get('Perfect', 0)
         ok = score_ini['HiScore.Drums'].get('Great', 0)
@@ -68,6 +101,7 @@ def read_tjap3_score(input_file: Path):
         return scores, clears, [good, ok, bad]
     else:
         return scores, clears, None
+
 
 def build_song_hashes(output_dir=Path("cache")):
     """Build a dictionary of song hashes and save it to a file."""
@@ -87,10 +121,12 @@ def build_song_hashes(output_dir=Path("cache")):
             song_hashes = json.load(f, cls=DiffHashesDecoder)
             if get_db_version() != DB_VERSION:
                 update_db_version()
-                for hash in song_hashes:
-                    entry = song_hashes[hash][0]
-                    for diff in entry["diff_hashes"]:
-                        db_updates.append((entry["diff_hashes"][diff], entry["title"]["en"], entry["title"].get("ja", ""), int(diff)))
+                for entries in song_hashes.values():
+                    for entry in entries:
+                        en_name = entry["title"].get("en", "")
+                        jp_name = entry["title"].get("ja", "")
+                        for diff, diff_hash in entry.get("diff_hashes", {}).items():
+                            db_updates.append((diff_hash, en_name, jp_name, int(diff)))
 
     if index_path.exists():
         with open(index_path, "r", encoding="utf-8") as f:
@@ -163,8 +199,14 @@ def build_song_hashes(output_dir=Path("cache")):
                 diff_hashes = dict()
 
                 for diff in parser.metadata.course_data:
-                    diff_notes, branch_m, branch_e, branch_n = TJAParser.notes_to_position(TJAParser(parser.file_path), diff)
-                    diff_hashes[diff] = parser.hash_note_data(diff_notes)
+                    diff_notes, branch_m, branch_e, branch_n = TJAParser.notes_to_position(
+                        TJAParser(parser.file_path), diff)
+
+                    note_hash = parser.hash_note_data(diff_notes)
+                    diff_hashes[diff] = hashlib.sha256(
+                        f"{path_str}|{diff}|{note_hash}".encode("utf-8")
+                    ).hexdigest()
+
                     all_notes.play_notes.extend(diff_notes.play_notes)
                     if branch_m:
                         for branch in branch_m:
@@ -203,7 +245,8 @@ def build_song_hashes(output_dir=Path("cache")):
         global_data.song_paths[tja_path] = hash_val
 
         # Prepare database updates for each difficulty
-        en_name = parser.metadata.title.get('en', '') if isinstance(parser.metadata.title, dict) else str(parser.metadata.title)
+        en_name = parser.metadata.title.get('en', '') if isinstance(parser.metadata.title, dict) else str(
+            parser.metadata.title)
         jp_name = parser.metadata.title.get('ja', '') if isinstance(parser.metadata.title, dict) else ''
 
         score_ini_path = tja_path.with_suffix('.tja.score.ini')
@@ -259,11 +302,12 @@ def build_song_hashes(output_dir=Path("cache")):
 
                 # Find all entries that match by name and difficulty
                 cursor.execute("""
-                    SELECT hash, clear, score
-                    FROM scores
-                    WHERE (en_name = ? AND jp_name = ?) AND diff = ?
-                    ORDER BY clear DESC, score DESC
-                """, (en_name, jp_name, diff))
+                               SELECT hash, clear, score
+                               FROM scores
+                               WHERE (en_name = ? AND jp_name = ?)
+                                 AND diff = ?
+                               ORDER BY clear DESC, score DESC
+                               """, (en_name, jp_name, diff))
 
                 entries = cursor.fetchall()
                 if any(entry[0] == diff_hash for entry in entries):
@@ -277,27 +321,35 @@ def build_song_hashes(output_dir=Path("cache")):
 
                     delete_entries = entries[1:]
 
-                    logger.info(f"Found {len(entries)} duplicate entries for {en_name} ({diff}). Keeping entry with crown={keep_crown}, score={keep_score}, deleting {len(delete_entries)} duplicates.")
+                    logger.info(
+                        f"Found {len(entries)} duplicate entries for {en_name} ({diff}). Keeping entry with crown={keep_crown}, score={keep_score}, deleting {len(delete_entries)} duplicates.")
 
                     for entry in delete_entries:
                         cursor.execute("""
-                            DELETE FROM scores
-                            WHERE (en_name = ? AND jp_name = ?) AND diff = ? AND hash = ?
-                        """, (en_name, jp_name, diff, entry[0]))
+                                       DELETE
+                                       FROM scores
+                                       WHERE (en_name = ? AND jp_name = ?)
+                                         AND diff = ?
+                                         AND hash = ?
+                                       """, (en_name, jp_name, diff, entry[0]))
 
                     cursor.execute("""
-                        UPDATE scores
-                        SET hash = ?
-                        WHERE (en_name = ? AND jp_name = ?) AND diff = ? AND hash = ?
-                    """, (diff_hash, en_name, jp_name, diff, keep_hash))
+                                   UPDATE scores
+                                   SET hash = ?
+                                   WHERE (en_name = ? AND jp_name = ?)
+                                     AND diff = ?
+                                     AND hash = ?
+                                   """, (diff_hash, en_name, jp_name, diff, keep_hash))
                     total_updates += 1
-                    logger.info(f"Deleted {len(delete_entries)} duplicate entries and updated hash for {en_name} ({diff})")
+                    logger.info(
+                        f"Deleted {len(delete_entries)} duplicate entries and updated hash for {en_name} ({diff})")
                 else:
                     cursor.execute("""
-                        UPDATE scores
-                        SET hash = ?
-                        WHERE (en_name = ? AND jp_name = ?) AND diff = ?
-                    """, (diff_hash, en_name, jp_name, diff))
+                                   UPDATE scores
+                                   SET hash = ?
+                                   WHERE (en_name = ? AND jp_name = ?)
+                                     AND diff = ?
+                                   """, (diff_hash, en_name, jp_name, diff))
 
                     if cursor.rowcount > 0:
                         total_updates += 1
@@ -324,6 +376,7 @@ def build_song_hashes(output_dir=Path("cache")):
         f.write(str(current_timestamp))
 
     return song_hashes
+
 
 def process_tja_file(tja_file):
     """Process a single TJA file and return hash or None if error"""
@@ -355,6 +408,7 @@ def process_tja_file(tja_file):
         return ''
     hash = tja.hash_note_data(all_notes)
     return hash
+
 
 def get_japanese_songs_for_version(csv_file_path, version_column):
     # Read CSV file and filter rows where the specified version column has 'YES'
@@ -464,9 +518,9 @@ def get_japanese_songs_for_version(csv_file_path, version_column):
         if not Path(f"{version_column}/{genre}").exists():
             Path(f"{version_column}/{genre}").mkdir()
         with open(
-            Path(f"{version_column}/{genre}/song_list.txt"),
-            "w",
-            encoding="utf-8-sig",
+                Path(f"{version_column}/{genre}/song_list.txt"),
+                "w",
+                encoding="utf-8-sig",
         ) as text_file:
             for item in text_files[genre]:
                 text_file.write(item + "\n")
