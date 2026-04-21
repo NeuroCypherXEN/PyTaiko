@@ -772,9 +772,9 @@ class TJAParser:
             if 'i' in part:
                 normalized = part.replace('.i', 'j').replace('i', 'j')
                 normalized = normalized.replace(',', '')
-                c = complex(normalized)
-                state.scroll_x_modifier = c.real
-                state.scroll_y_modifier = c.imag
+                complex_value = complex(normalized)
+                state.scroll_x_modifier = complex_value.real
+                state.scroll_y_modifier = complex_value.imag
             else:
                 state.scroll_x_modifier = float(part)
                 state.scroll_y_modifier = 0.0
@@ -859,9 +859,9 @@ class TJAParser:
         if 'i' in distance_str:
             normalized = distance_str.replace('.i', 'j').replace('i', 'j')
             normalized = normalized.replace(',', '')
-            c = complex(normalized)
-            delta_x = c.real
-            delta_y = c.imag
+            complex_value = complex(normalized)
+            delta_x = complex_value.real
+            delta_y = complex_value.imag
         else:
             distance = float(distance_str)
             delta_x = distance
@@ -1121,25 +1121,25 @@ class TJAParser:
 
     def hash_note_data(self, notes: NoteList):
         """Hashes the note data for the given NoteList."""
-        n = hashlib.sha256()
-        list1 = notes.play_notes
-        list2 = notes.bars
+        hash_builder = hashlib.sha256()
+        play_notes = notes.play_notes
+        bar_notes = notes.bars
         merged: list[Note | Drumroll | Balloon] = []
-        i = 0
-        j = 0
-        while i < len(list1) and j < len(list2):
-            if list1[i] <= list2[j]:
-                merged.append(list1[i])
-                i += 1
+        play_index = 0
+        bar_index = 0
+        while play_index < len(play_notes) and bar_index < len(bar_notes):
+            if play_notes[play_index] <= bar_notes[bar_index]:
+                merged.append(play_notes[play_index])
+                play_index += 1
             else:
-                merged.append(list2[j])
-                j += 1
-        merged.extend(list1[i:])
-        merged.extend(list2[j:])
+                merged.append(bar_notes[bar_index])
+                bar_index += 1
+        merged.extend(play_notes[play_index:])
+        merged.extend(bar_notes[bar_index:])
         for item in merged:
-            n.update(item.get_hash().encode('utf-8'))
+            hash_builder.update(item.get_hash().encode('utf-8'))
 
-        return n.hexdigest()
+        return hash_builder.hexdigest()
 
 
 def modifier_speed(notes: NoteList, value: float):

@@ -1343,22 +1343,22 @@ class DanCourse(FileSystemItem):
         super().__init__(path, name)
         if name != "dan.json":
             logger.error(f"Invalid dan course file: {path}")
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        with open(path, 'r', encoding='utf-8') as dan_file:
+            data = json.load(dan_file)
             self.title = data["title"]
             self.color = data["color"]
             self.charts: list[tuple[TJAParser, int, int, int]] = []
             for chart in data["charts"]:
-                hash = chart["hash"]
+                chart_hash = chart["hash"]
                 chart_title = chart["title"]
                 chart_subtitle = chart["subtitle"]
                 difficulty = chart["difficulty"]
-                path = None
-                if hash in global_data.song_hashes:
+                course_path = None
+                if chart_hash in global_data.song_hashes:
                     subtitle_match = chart_subtitle.removeprefix('--').strip()
                     entry = next(
                         (
-                            song for song in global_data.song_hashes[hash]
+                            song for song in global_data.song_hashes[chart_hash]
                             if song["title"]["en"].strip() == chart_title
                                and song["subtitle"]["en"].strip() == subtitle_match
                                and Path(song["file_path"]).exists()
@@ -1366,9 +1366,9 @@ class DanCourse(FileSystemItem):
                         None
                     )
                     if entry is None:
-                        entry = get_song_hash_entry(hash)
+                        entry = get_song_hash_entry(chart_hash)
                     if entry is not None:
-                        path = Path(entry["file_path"])
+                        course_path = Path(entry["file_path"])
                 else:
                     for key, value in global_data.song_hashes.items():
                         for i in range(len(value)):
@@ -1377,16 +1377,16 @@ class DanCourse(FileSystemItem):
                                     song["subtitle"]["en"].strip() == chart_subtitle.removeprefix('--') and
                                     Path(song["file_path"]).exists()):
                                 hash_val = key
-                                path = Path(global_data.song_hashes[hash_val][i]["file_path"])
+                                course_path = Path(global_data.song_hashes[hash_val][i]["file_path"])
                                 break
-                if path is None:
-                    logger.warning(f"Failed to resolve dan chart path for hash={hash}, title={chart_title}")
+                if course_path is None:
+                    logger.warning(f"Failed to resolve dan chart path for hash={chart_hash}, title={chart_title}")
                     continue
-                if (path.parent.parent / "box.def").exists():
-                    genre_index = parse_box_def(path.parent.parent)[2]
+                if (course_path.parent.parent / "box.def").exists():
+                    genre_index = parse_box_def(course_path.parent.parent)[2]
                 else:
                     genre_index = GenreIndex.NAMCO
-                tja = TJAParser(path)
+                tja = TJAParser(course_path)
                 self.charts.append((tja, genre_index, difficulty, tja.metadata.course_data[difficulty].level))
             self.exams = []
             for exam in data["exams"]:
@@ -1694,10 +1694,10 @@ class FileNavigator:
         dir_key = str(dir_path)
         if dir_path.iterdir():
             name = dir_path.name
-            for file in dir_path.iterdir():
-                if file.name.endswith('.osu'):
-                    with open(file, 'r', encoding='utf-8') as f:
-                        content = f.readlines()
+            for osu_file in dir_path.iterdir():
+                if osu_file.name.endswith('.osu'):
+                    with open(osu_file, 'r', encoding='utf-8') as osu_stream:
+                        content = osu_stream.readlines()
                         for line in content:
                             if line.startswith('TitleUnicode:'):
                                 title_unicode = line.split(':', 1)[1].strip()
@@ -1798,30 +1798,30 @@ class FileNavigator:
                             temp_items.append(item)
         return random.sample(temp_items, min(10, len(temp_items)))
 
-    def _levenshtein_distance(self, s1: str, s2: str):
+    def _levenshtein_distance(self, source_text: str, target_text: str):
         # Create a matrix to store distances
-        m, n = len(s1), len(s2)
-        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        source_len, target_len = len(source_text), len(target_text)
+        distance_matrix = [[0] * (target_len + 1) for _ in range(source_len + 1)]
 
         # Initialize base cases
-        for i in range(m + 1):
-            dp[i][0] = i
-        for j in range(n + 1):
-            dp[0][j] = j
+        for source_index in range(source_len + 1):
+            distance_matrix[source_index][0] = source_index
+        for target_index in range(target_len + 1):
+            distance_matrix[0][target_index] = target_index
 
         # Fill the matrix
-        for i in range(1, m + 1):
-            for j in range(1, n + 1):
-                if s1[i - 1] == s2[j - 1]:
-                    dp[i][j] = dp[i - 1][j - 1]  # No operation needed
+        for source_index in range(1, source_len + 1):
+            for target_index in range(1, target_len + 1):
+                if source_text[source_index - 1] == target_text[target_index - 1]:
+                    distance_matrix[source_index][target_index] = distance_matrix[source_index - 1][target_index - 1]
                 else:
-                    dp[i][j] = 1 + min(
-                        dp[i - 1][j],  # Deletion
-                        dp[i][j - 1],  # Insertion
-                        dp[i - 1][j - 1]  # Substitution
+                    distance_matrix[source_index][target_index] = 1 + min(
+                        distance_matrix[source_index - 1][target_index],
+                        distance_matrix[source_index][target_index - 1],
+                        distance_matrix[source_index - 1][target_index - 1]
                     )
 
-        return dp[m][n]
+        return distance_matrix[source_len][target_len]
 
     def search_song(self, search_name: str):
         items = []

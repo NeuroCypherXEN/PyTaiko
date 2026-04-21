@@ -113,8 +113,8 @@ right_kat = ["v"]
             with patch.object(config_module, '_get_config_path', return_value=config_path):
                 config_module.save_config(config_data)
 
-            with open(config_path, "r", encoding="utf-8") as f:
-                saved = tomlkit.load(f)
+            with open(config_path, "r", encoding="utf-8") as config_stream:
+                saved = tomlkit.load(config_stream)
 
         self.assertEqual(saved['keys']['exit_key'], 'Q')
         self.assertEqual(saved['keys']['pause_key'], 'space')

@@ -169,9 +169,9 @@ class GameScreen(Screen):
         with sqlite3.connect(global_data.score_db) as con:
             session_data = global_data.session_data[global_data.player_num]
             cursor = con.cursor()
-            hash = session_data.song_hash
+            song_hash = session_data.song_hash
             check_query = "SELECT score, clear FROM Scores WHERE hash = ? LIMIT 1"
-            cursor.execute(check_query, (hash,))
+            cursor.execute(check_query, (song_hash,))
             result = cursor.fetchone()
             existing_score = result[0] if result is not None else None
             existing_crown = result[1] if result is not None and len(result) > 1 and result[1] is not None else 0
@@ -188,7 +188,7 @@ class GameScreen(Screen):
                 INSERT OR REPLACE INTO Scores (hash, en_name, jp_name, diff, score, good, ok, bad, drumroll, combo, clear)
                 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 '''
-                data = (hash, self.parser.metadata.title['en'],
+                data = (song_hash, self.parser.metadata.title['en'],
                         self.parser.metadata.title.get('ja', ''), self.player_1.difficulty,
                         session_data.result_data.score, session_data.result_data.good,
                         session_data.result_data.ok, session_data.result_data.bad,
@@ -198,7 +198,7 @@ class GameScreen(Screen):
                 logger.info(f"Wrote score {session_data.result_data.score} for {self.parser.metadata.title['en']}")
                 con.commit()
             if result is None or (existing_crown is not None and crown > existing_crown):
-                cursor.execute("UPDATE Scores SET clear = ? WHERE hash = ?", (crown, hash))
+                cursor.execute("UPDATE Scores SET clear = ? WHERE hash = ?", (crown, song_hash))
                 con.commit()
 
     def start_song(self, ms_from_start):
@@ -488,29 +488,29 @@ class Player:
         self.draw_note_list = deque(sorted(self.draw_note_list, key=lambda n: n.load_ms))
 
         # Handle HBSCROLL, BMSCROLL (pre-modify hit_ms, so that notes can't be literally hit, but are still visually different) - basically it applies the transformations of #BPMCHANGE and #DELAY to hit_ms, so that notes can't be hit even if its visaulyl
-        for i, o in enumerate(self.timeline):
-            if hasattr(o, 'bpmchange'):
-                hit_ms = o.hit_ms
-                bpmchange = o.bpmchange
+        for timeline_index, timeline_object in enumerate(self.timeline):
+            if hasattr(timeline_object, 'bpmchange'):
+                hit_ms = timeline_object.hit_ms
+                bpmchange = timeline_object.bpmchange
                 for note in chain(self.draw_note_list, self.draw_bar_list):
                     if note.hit_ms > hit_ms:
                         note.hit_ms = (note.hit_ms - hit_ms) / bpmchange + hit_ms
-                for i2 in range(i + 1, len(self.timeline)):
-                    o2 = self.timeline[i2]
-                    if not hasattr(o2, 'bpmchange'):
+                for following_index in range(timeline_index + 1, len(self.timeline)):
+                    following_object = self.timeline[following_index]
+                    if not hasattr(following_object, 'bpmchange'):
                         continue
-                    o2.hit_ms = (o2.hit_ms - hit_ms) / bpmchange + hit_ms
-            elif hasattr(o, 'delay'):
-                hit_ms = o.hit_ms
-                delay = o.delay
+                    following_object.hit_ms = (following_object.hit_ms - hit_ms) / bpmchange + hit_ms
+            elif hasattr(timeline_object, 'delay'):
+                hit_ms = timeline_object.hit_ms
+                delay = timeline_object.delay
                 for note in chain(self.draw_note_list, self.draw_bar_list):
                     if note.hit_ms > hit_ms:
                         note.hit_ms += delay
-                for i2 in range(i + 1, len(self.timeline)):
-                    o2 = self.timeline[i2]
-                    if not hasattr(o2, 'delay'):
+                for following_index in range(timeline_index + 1, len(self.timeline)):
+                    following_object = self.timeline[following_index]
+                    if not hasattr(following_object, 'delay'):
                         continue
-                    o2.hit_ms += delay
+                    following_object.hit_ms += delay
 
         # Decide end_time after all transforms have been applied
         self.end_time = self.play_notes[-1].hit_ms if self.play_notes else 0

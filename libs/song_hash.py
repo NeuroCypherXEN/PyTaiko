@@ -117,8 +117,8 @@ def build_song_hashes(output_dir=Path("cache")):
 
     # Load existing data
     if output_path.exists():
-        with open(output_path, "r", encoding="utf-8") as f:
-            song_hashes = json.load(f, cls=DiffHashesDecoder)
+        with open(output_path, "r", encoding="utf-8") as hash_file:
+            song_hashes = json.load(hash_file, cls=DiffHashesDecoder)
             if get_db_version() != DB_VERSION:
                 update_db_version()
                 for entries in song_hashes.values():
@@ -129,14 +129,14 @@ def build_song_hashes(output_dir=Path("cache")):
                             db_updates.append((diff_hash, en_name, jp_name, int(diff)))
 
     if index_path.exists():
-        with open(index_path, "r", encoding="utf-8") as f:
-            path_to_hash = json.load(f)
+        with open(index_path, "r", encoding="utf-8") as index_file:
+            path_to_hash = json.load(index_file)
 
     saved_timestamp = 0.0
     current_timestamp = time.time()
     if (output_dir / 'timestamp.txt').exists():
-        with open(output_dir / 'timestamp.txt', 'r') as f:
-            saved_timestamp = float(f.read())
+        with open(output_dir / 'timestamp.txt', 'r') as timestamp_file:
+            saved_timestamp = float(timestamp_file.read())
 
     tja_paths = get_config()["paths"]["tja_path"]
     all_tja_files: list[Path] = []
@@ -368,12 +368,12 @@ def build_song_hashes(output_dir=Path("cache")):
         logger.warning(f"Warning: scores.db not found, skipping {len(db_updates)} database updates")
 
     # Save both files
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(song_hashes, f, indent=2, ensure_ascii=False)
-    with open(index_path, "w", encoding="utf-8") as f:
-        json.dump(path_to_hash, f, indent=2, ensure_ascii=False)
-    with open(output_dir / 'timestamp.txt', 'w') as f:
-        f.write(str(current_timestamp))
+    with open(output_path, "w", encoding="utf-8") as hash_file:
+        json.dump(song_hashes, hash_file, indent=2, ensure_ascii=False)
+    with open(index_path, "w", encoding="utf-8") as index_file:
+        json.dump(path_to_hash, index_file, indent=2, ensure_ascii=False)
+    with open(output_dir / 'timestamp.txt', 'w') as timestamp_file:
+        timestamp_file.write(str(current_timestamp))
 
     return song_hashes
 
@@ -406,16 +406,16 @@ def process_tja_file(tja_file):
                 all_notes.bars.extend(branch.bars)
     if all_notes == []:
         return ''
-    hash = tja.hash_note_data(all_notes)
-    return hash
+    note_hash = tja.hash_note_data(all_notes)
+    return note_hash
 
 
 def get_japanese_songs_for_version(csv_file_path, version_column):
     # Read CSV file and filter rows where the specified version column has 'YES'
     version_songs = []
 
-    with open(csv_file_path, 'r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
+    with open(csv_file_path, 'r', encoding='utf-8') as csv_file:
+        reader = csv.DictReader(csv_file)
         for row in reader:
             if row.get(version_column, "NO") != "NO":
                 version_songs.append(row)
@@ -503,13 +503,13 @@ def get_japanese_songs_for_version(csv_file_path, version_column):
             path = Path(input(f"NOT FOUND {title}: "))
         if path == Path():
             continue
-        hash = process_tja_file(path)
+        note_hash = process_tja_file(path)
         tja_parse = TJAParser(Path(path))
         genre = Path(path).parent.parent.name
         if genre not in text_files:
             text_files[genre] = []
         text_files[genre].append(
-            f"{hash}|{tja_parse.metadata.title['en'].strip()}|{tja_parse.metadata.subtitle['en'].strip()}"
+            f"{note_hash}|{tja_parse.metadata.title['en'].strip()}|{tja_parse.metadata.subtitle['en'].strip()}"
         )
         print(f"Added {title}: {path}")
     for genre in text_files:

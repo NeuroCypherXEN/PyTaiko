@@ -100,17 +100,17 @@ class OsuParser:
                 obj.bpm = math.floor(1 / points[1] * 1000 * 60)
                 note_list.timeline.append(obj)
 
-    def get_scroll_multiplier(self, ms: float) -> float:
+    def get_scroll_multiplier(self, current_ms: float) -> float:
         base_scroll = (
             1.0 if 1.37 <= self.slider_multiplier <= 1.47
             else self.slider_multiplier / 1.40
         )
         current_scroll = 1.0
 
-        for tp in self.timing_points:
-            time = tp[0]
-            beat_length = tp[1]
-            if time > ms:
+        for timing_point in self.timing_points:
+            time = timing_point[0]
+            beat_length = timing_point[1]
+            if time > current_ms:
                 break
             if beat_length < 0:
                 current_scroll = -100.0 / beat_length
@@ -263,22 +263,22 @@ class OsuParser:
 
     def hash_note_data(self, notes: NoteList):
         """Hashes the note data for the given NoteList."""
-        n = hashlib.sha256()
-        list1 = notes.play_notes
-        list2 = notes.bars
+        hash_builder = hashlib.sha256()
+        play_notes = notes.play_notes
+        bar_notes = notes.bars
         merged = []
-        i = 0
-        j = 0
-        while i < len(list1) and j < len(list2):
-            if list1[i] <= list2[j]:
-                merged.append(list1[i])
-                i += 1
+        play_index = 0
+        bar_index = 0
+        while play_index < len(play_notes) and bar_index < len(bar_notes):
+            if play_notes[play_index] <= bar_notes[bar_index]:
+                merged.append(play_notes[play_index])
+                play_index += 1
             else:
-                merged.append(list2[j])
-                j += 1
-        merged.extend(list1[i:])
-        merged.extend(list2[j:])
+                merged.append(bar_notes[bar_index])
+                bar_index += 1
+        merged.extend(play_notes[play_index:])
+        merged.extend(bar_notes[bar_index:])
         for item in merged:
-            n.update(item.get_hash().encode('utf-8'))
+            hash_builder.update(item.get_hash().encode('utf-8'))
 
-        return n.hexdigest()
+        return hash_builder.hexdigest()

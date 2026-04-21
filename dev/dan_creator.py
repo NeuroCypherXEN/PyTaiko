@@ -24,17 +24,17 @@ def create_dan(cache_path: Path):
     for i in range(3):
         chart = dict()
         chart_path = Path(input(f"Enter chart path {i + 1}: "))
-        with open(f"{cache_path}/path_to_hash.json", encoding='utf-8') as f:
-            hash_directory = json.load(f)
+        with open(f"{cache_path}/path_to_hash.json", encoding='utf-8') as path_hash_file:
+            hash_directory = json.load(path_hash_file)
             chart["hash"] = hash_directory.get(chart_path)
-        with open(f"{cache_path}/song_hashes.json", encoding='utf-8') as f:
-            hash_directory = json.load(f)
+        with open(f"{cache_path}/song_hashes.json", encoding='utf-8') as song_hash_file:
+            hash_directory = json.load(song_hash_file)
             chart["title"] = hash_directory[chart["hash"]][0]["title"]["en"]
             chart["subtitle"] = hash_directory[chart["hash"]][0]["subtitle"]["en"]
         chart["difficulty"] = int(input(f"Enter chart difficulty {i + 1}: "))
         dan_data["charts"].append(chart)
-    with open("dan.json", "w", encoding="utf-8") as f:
-        json.dump(dan_data, f, indent=4, ensure_ascii=False)
+    with open("dan.json", "w", encoding="utf-8") as output_file:
+        json.dump(dan_data, output_file, indent=4, ensure_ascii=False)
         print("Dan data saved successfully.")
 
 

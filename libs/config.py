@@ -182,8 +182,8 @@ def get_config() -> Config:
     """Load TOML config and convert keyboard bindings into key codes."""
     config_path = _get_config_path()
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_file: tomlkit.TOMLDocument = tomlkit.load(f)
+    with open(config_path, "r", encoding="utf-8") as config_stream:
+        config_file: tomlkit.TOMLDocument = tomlkit.load(config_stream)
 
     config: Config = _to_plain_dict(config_file)
     _convert_single_key_bindings(config['keys'], get_key_code)
@@ -201,5 +201,5 @@ def save_config(config: Config) -> None:
     _convert_multi_key_bindings(config_to_save['keys_2p'], get_key_string)
 
     config_path = _get_config_path()
-    with open(config_path, "w", encoding="utf-8") as f:
-        tomlkit.dump(config_to_save, f)
+    with open(config_path, "w", encoding="utf-8") as config_stream:
+        tomlkit.dump(config_to_save, config_stream)
