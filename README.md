@@ -1,3 +1,7 @@
+修正：
+- 皇冠顯示問題
+- 難度搜尋皇冠統計問題
+
 # PyTaiko
 
 A TJA player and Taiko simulator written in Python using the [raylib](https://www.raylib.com/) library.
