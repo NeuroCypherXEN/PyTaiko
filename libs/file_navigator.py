@@ -2105,8 +2105,9 @@ class FileNavigator:
                 if not line:
                     continue
 
-                parts = line.split('|')
+                parts = line.split('|', 2)
                 if len(parts) < 3:
+                    logger.warning(f"Skipping malformed song_list entry: {line}")
                     continue
 
                 hash_val, title, subtitle = parts[0], parts[1], parts[2]
@@ -2287,7 +2288,11 @@ class FileNavigator:
                 line = line.strip()
                 if not line:  # Skip empty lines
                     continue
-                hash, title, subtitle = line.split('|')
+                parts = line.split('|', 2)
+                if len(parts) < 3:
+                    logger.warning(f"Skipping malformed favorites entry: {line}")
+                    continue
+                hash, title, subtitle = parts
                 if song.hash == hash or (
                         song.parser.metadata.title['en'] == title and song.parser.metadata.subtitle['en'] == subtitle):
                     if not self.in_favorites:

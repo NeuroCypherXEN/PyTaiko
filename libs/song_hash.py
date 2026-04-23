@@ -18,6 +18,16 @@ logger = logging.getLogger(__name__)
 DB_VERSION = 1
 
 
+def safe_extract_zip(zip_file: zipfile.ZipFile, destination: Path) -> None:
+    """Extract zip file members while preventing path traversal."""
+    destination = destination.resolve()
+    for member in zip_file.namelist():
+        member_path = (destination / member).resolve()
+        if member_path != destination and destination not in member_path.parents:
+            raise ValueError(f"Unsafe zip entry path: {member}")
+    zip_file.extractall(destination)
+
+
 def diff_hashes_object_hook(obj):
     if "diff_hashes" in obj:
         obj["diff_hashes"] = {
@@ -88,16 +98,19 @@ def read_tjap3_score(input_file: Path):
               int(score_ini['HiScore.Drums'].get('Clear2', 0)),
               int(score_ini['HiScore.Drums'].get('Clear3', 0)),
               int(score_ini['HiScore.Drums'].get('Clear4', 0))]
-    if score_ini['HiScore.Drums']['PerfectRange'] != 25:
+    perfect_range = int(score_ini['HiScore.Drums'].get('PerfectRange', 0))
+    good_range = int(score_ini['HiScore.Drums'].get('GoodRange', 0))
+    poor_range = int(score_ini['HiScore.Drums'].get('PoorRange', 0))
+    if perfect_range != 25:
         return [0], [0], None
-    if score_ini['HiScore.Drums']['GoodRange'] != 75:
+    if good_range != 75:
         return [0], [0], None
-    if score_ini['HiScore.Drums']['PoorRange'] != 108:
+    if poor_range != 108:
         return [0], [0], None
-    if score_ini['HiScore.Drums']['Perfect'] != 0:
-        good = score_ini['HiScore.Drums'].get('Perfect', 0)
-        ok = score_ini['HiScore.Drums'].get('Great', 0)
-        bad = score_ini['HiScore.Drums'].get('Miss', 0)
+    good = int(score_ini['HiScore.Drums'].get('Perfect', 0))
+    if good != 0:
+        ok = int(score_ini['HiScore.Drums'].get('Great', 0))
+        bad = int(score_ini['HiScore.Drums'].get('Miss', 0))
         return scores, clears, [good, ok, bad]
     else:
         return scores, clears, None
@@ -105,14 +118,13 @@ def read_tjap3_score(input_file: Path):
 
 def build_song_hashes(output_dir=Path("cache")):
     """Build a dictionary of song hashes and save it to a file."""
-    if not output_dir.exists():
-        output_dir.mkdir()
+    output_dir.mkdir(parents=True, exist_ok=True)
     song_hashes: dict[str, list[dict]] = dict()
     path_to_hash: dict[str, str] = dict()  # New index for O(1) path lookups
     output_path = Path(output_dir / "song_hashes.json")
     index_path = Path(output_dir / "path_to_hash.json")
     # Prepare database connection for updates
-    db_path = Path("scores.db")
+    db_path = Path(global_data.score_db) if global_data.score_db else Path("scores.db")
     db_updates = []  # Store updates to batch process later
 
     # Load existing data
@@ -136,7 +148,12 @@ def build_song_hashes(output_dir=Path("cache")):
     current_timestamp = time.time()
     if (output_dir / 'timestamp.txt').exists():
         with open(output_dir / 'timestamp.txt', 'r') as timestamp_file:
-            saved_timestamp = float(timestamp_file.read())
+            timestamp_content = timestamp_file.read().strip()
+            try:
+                saved_timestamp = float(timestamp_content)
+            except ValueError:
+                logger.warning("Invalid timestamp cache detected, rebuilding song hash cache")
+                saved_timestamp = 0.0
 
     tja_paths = get_config()["paths"]["tja_path"]
     all_tja_files: list[Path] = []
@@ -155,7 +172,7 @@ def build_song_hashes(output_dir=Path("cache")):
     for tja_path in all_tja_files:
         if tja_path.suffix == '.osz':
             with zipfile.ZipFile(tja_path, 'r') as zip_file:
-                zip_file.extractall(tja_path.with_suffix(''))
+                safe_extract_zip(zip_file, tja_path.with_suffix(''))
             zip_path = Path(tja_path.with_suffix(''))
             tja_path.unlink()
             for file in zip_path.glob('*.osu'):
@@ -169,10 +186,8 @@ def build_song_hashes(output_dir=Path("cache")):
                 global_data.song_paths[tja_path] = current_hash
                 continue
         current_hash = path_to_hash.get(tja_path_str)
-        if current_hash is None:
-            files_to_process.append(tja_path)
-        else:
-            files_to_process.append(tja_path)
+        files_to_process.append(tja_path)
+        if current_hash is not None:
             if current_hash in song_hashes:
                 del song_hashes[current_hash]
             del path_to_hash[tja_path_str]
@@ -355,8 +370,7 @@ def build_song_hashes(output_dir=Path("cache")):
                         total_updates += 1
                         logger.info(f"Updated hash for {en_name} ({diff})")
 
-                conn.commit()
-
+            conn.commit()
             conn.close()
             logger.info(f"Database update completed. Processed {total_updates} difficulty hash updates.")
 
@@ -365,7 +379,7 @@ def build_song_hashes(output_dir=Path("cache")):
         except Exception as e:
             logger.error(f"Error updating database: {e}")
     elif db_updates:
-        logger.warning(f"Warning: scores.db not found, skipping {len(db_updates)} database updates")
+        logger.warning(f"Warning: {db_path} not found, skipping {len(db_updates)} database updates")
 
     # Save both files
     with open(output_path, "w", encoding="utf-8") as hash_file:
@@ -404,7 +418,7 @@ def process_tja_file(tja_file):
         if branch_n:
             for branch in branch_n:
                 all_notes.bars.extend(branch.bars)
-    if all_notes == []:
+    if not all_notes.play_notes and not all_notes.bars:
         return ''
     note_hash = tja.hash_note_data(all_notes)
     return note_hash
